@@ -1,3 +1,5 @@
+import Player, * as P from "./components/Player";
+
 type TargetWord = { status: "guessing" | "unveiled"; word: string };
 
 type WordHintMessage = {
@@ -19,21 +21,19 @@ type WordmasterProps = {
   name: string;
 };
 
-type PlayerProps = {
-  hint: string | undefined;
-  id: string;
-  isTyping: boolean;
-  name: string;
-};
-
 const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
-const MOCK_PLAYERS: PlayerProps[] = [
+const MOCK_PLAYERS: P.Props[] = [
   { hint: undefined, id: "1", isTyping: true, name: "Bob" },
   { hint: undefined, id: "2", isTyping: false, name: "Alice" },
-  { hint: "evangelist", id: "3", isTyping: false, name: "Gandalf" },
+  {
+    hint: "they wish to introduce you to the lord and savior",
+    id: "3",
+    isTyping: false,
+    name: "Gandalf",
+  },
 ];
 
 export default function Home() {
@@ -43,7 +43,11 @@ export default function Home() {
         <div className="flex flex-col gap-8 items-center">
           <WordDisplay target={MOCK_TARGET_WORD} />
           <Wordmaster id="0" name={MOCK_WORDMASTER} />
-          <div className="flex gap-2">{MOCK_PLAYERS.map(Player)}</div>
+          <div className="flex gap-2">
+            {MOCK_PLAYERS.map((props) => (
+              <Player key={props.id} {...props} />
+            ))}
+          </div>
           <input
             className="p-1 min-w-96 border-2 border-zinc-300 rounded-lg focus:outline-zinc-800"
             placeholder="guess here..."
@@ -82,24 +86,6 @@ function Wordmaster({ name }: WordmasterProps) {
         <h3>{name}</h3>
       </div>
       <p className="ml-2">placeholder</p>
-    </div>
-  );
-}
-
-function Player({ hint, id, isTyping, name }: PlayerProps) {
-  return (
-    <div
-      key={id}
-      className="px-0 pt-0 w-40 h-16 p-2 border-2 border-zinc-300 rounded-lg"
-    >
-      <div className="w-fit -mx-[.125rem] -mt-[.125rem] px-2 border-2 rounded-tl-lg rounded-br-lg border-zinc-300">
-        <h3>{name}</h3>
-      </div>
-      {hint !== undefined && hint !== "" ? (
-        <p className="ml-2">{hint}</p>
-      ) : isTyping ? (
-        <p className="ml-2 tracking-widest">...</p>
-      ) : undefined}
     </div>
   );
 }
