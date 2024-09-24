@@ -1,5 +1,17 @@
+type TargetWord = { status: "guessing" | "unveiled"; word: string };
+
+type WordHintMessage = {
+  playerId: string;
+  hint: string;
+};
+
+type WordGuessMessage = {
+  playerId: string;
+  guess: string;
+};
+
 type WordDisplayProps = {
-  unveiled: string;
+  target: TargetWord;
 };
 
 type WordmasterProps = {
@@ -8,18 +20,20 @@ type WordmasterProps = {
 };
 
 type PlayerProps = {
+  hint: string | undefined;
   id: string;
+  isTyping: boolean;
   name: string;
 };
 
-const MOCK_WORD_UNVEILED: string = "evange";
+const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
 const MOCK_PLAYERS: PlayerProps[] = [
-  { id: "1", name: "Bob" },
-  { id: "2", name: "Alice" },
-  { id: "3", name: "Gandalf" },
+  { hint: undefined, id: "1", isTyping: true, name: "Bob" },
+  { hint: undefined, id: "2", isTyping: false, name: "Alice" },
+  { hint: "evangelist", id: "3", isTyping: false, name: "Gandalf" },
 ];
 
 export default function Home() {
@@ -27,7 +41,7 @@ export default function Home() {
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
         <div className="flex flex-col gap-8 items-center">
-          <WordDisplay unveiled={MOCK_WORD_UNVEILED} />
+          <WordDisplay target={MOCK_TARGET_WORD} />
           <Wordmaster id="0" name={MOCK_WORDMASTER} />
           <div className="flex gap-2">{MOCK_PLAYERS.map(Player)}</div>
           <input
@@ -43,10 +57,10 @@ export default function Home() {
   );
 }
 
-function WordDisplay({ unveiled }: WordDisplayProps) {
+function WordDisplay({ target }: WordDisplayProps) {
   return (
     <div className="flex gap-2">
-      {unveiled.split("").map((letter, ix) => (
+      {target.word.split("").map((letter, ix) => (
         <div
           className="p-2 w-16 border-2 border-zinc-800 rounded-lg bg-zinc-800 text-6xl text-zinc-100 font-light uppercase text-center"
           key={ix}
@@ -54,25 +68,38 @@ function WordDisplay({ unveiled }: WordDisplayProps) {
           {letter}
         </div>
       ))}
-      <div className="p-2 text-6xl font-light tracking-[1.5rem]">...</div>
+      {target.status === "guessing" ? (
+        <div className="p-2 text-6xl font-light tracking-[1.5rem]">...</div>
+      ) : undefined}
     </div>
   );
 }
 
 function Wordmaster({ name }: WordmasterProps) {
   return (
-    <div className="p-2 border-2 border-zinc-800 rounded-lg bg-zinc-800 text-zinc-100">
-      <h3>{name}</h3>
-      <p>--- placeholder guess ---</p>
+    <div className="px-0 pt-0 w-40 h-16 p-2 border-2 border-zinc-800 rounded-lg bg-zinc-800 text-zinc-100">
+      <div className="w-fit -mx-[.125rem] -mt-[.125rem] px-2 border-2 border-zinc-600 border-l-zinc-800 border-t-zinc-800 rounded-tl-lg rounded-br-lg ">
+        <h3>{name}</h3>
+      </div>
+      <p className="ml-2">placeholder</p>
     </div>
   );
 }
 
-function Player({ id, name }: PlayerProps) {
+function Player({ hint, id, isTyping, name }: PlayerProps) {
   return (
-    <div key={id} className="p-2 border-2 border-zinc-300 rounded-lg">
-      <h3>{name}</h3>
-      <p>--- placeholder hint ---</p>
+    <div
+      key={id}
+      className="px-0 pt-0 w-40 h-16 p-2 border-2 border-zinc-300 rounded-lg"
+    >
+      <div className="w-fit -mx-[.125rem] -mt-[.125rem] px-2 border-2 rounded-tl-lg rounded-br-lg border-zinc-300">
+        <h3>{name}</h3>
+      </div>
+      {hint !== undefined && hint !== "" ? (
+        <p className="ml-2">{hint}</p>
+      ) : isTyping ? (
+        <p className="ml-2 tracking-widest">...</p>
+      ) : undefined}
     </div>
   );
 }
