@@ -1,20 +1,41 @@
 "use client";
 
+import { type RefObject } from "react";
+
 export type Props = {
   guess: string | undefined;
   hint: string | undefined;
   id: string;
+  inputRef: RefObject<HTMLInputElement>;
   isTyping: boolean;
   name: string;
 };
 
-export default function Player({ guess, hint, id, isTyping, name }: Props) {
+export default function Player({
+  guess,
+  hint,
+  id,
+  inputRef,
+  isTyping,
+  name,
+}: Props) {
   const { classes, coverText, onClick } =
     hint !== undefined && hint !== ""
       ? {
           classes: { cursor: "cursor-pointer", visibility: "visible" },
-          coverText: guess !== undefined && guess !== "" ? "contact" : "guess",
-          onClick: () => alert("contact!"),
+          ...(guess !== undefined && guess !== ""
+            ? {
+                coverText: "contact",
+                onClick: () => alert("contact!"),
+              }
+            : {
+                coverText: "guess",
+                onClick: () => {
+                  // TODO - DOES NOTHING - does ref exist?
+                  inputRef.current?.focus();
+                  inputRef.current?.select();
+                },
+              }),
         }
       : {
           classes: { cursor: "auto", visibility: "invisible" },

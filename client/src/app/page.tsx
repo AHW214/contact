@@ -1,3 +1,9 @@
+// TODO
+"use client";
+
+import { type Ref, useRef } from "react";
+
+import Input from "./components/Input";
 import Player, * as P from "./components/Player";
 
 type TargetWord = { status: "guessing" | "unveiled"; word: string };
@@ -25,17 +31,15 @@ const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
-const MOCK_PLAYERS: P.Props[] = [
-  { guess: undefined, hint: undefined, id: "1", isTyping: true, name: "Bob" },
+const MOCK_PLAYERS = [
+  { hint: undefined, id: "1", isTyping: true, name: "Bob" },
   {
-    guess: undefined,
     hint: undefined,
     id: "2",
     isTyping: false,
     name: "Alice",
   },
   {
-    guess: undefined,
     hint: "they wish to introduce you to the lord and savior",
     id: "3",
     isTyping: false,
@@ -44,6 +48,8 @@ const MOCK_PLAYERS: P.Props[] = [
 ];
 
 export default function Home() {
+  const inputRef: Ref<HTMLInputElement> = useRef(null);
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
@@ -52,13 +58,15 @@ export default function Home() {
           <Wordmaster id="0" name={MOCK_WORDMASTER} />
           <div className="flex gap-2">
             {MOCK_PLAYERS.map((props) => (
-              <Player key={props.id} {...props} />
+              <Player
+                key={props.id}
+                inputRef={inputRef}
+                guess={undefined}
+                {...props}
+              />
             ))}
           </div>
-          <input
-            className="p-1 min-w-96 border-2 border-zinc-300 rounded-lg focus:outline-zinc-800"
-            placeholder="guess here..."
-          ></input>
+          <Input ref={inputRef} />
         </div>
       </main>
       <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
