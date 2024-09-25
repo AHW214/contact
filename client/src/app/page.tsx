@@ -26,9 +26,16 @@ const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
 const MOCK_PLAYERS: P.Props[] = [
-  { hint: undefined, id: "1", isTyping: true, name: "Bob" },
-  { hint: undefined, id: "2", isTyping: false, name: "Alice" },
+  { guess: undefined, hint: undefined, id: "1", isTyping: true, name: "Bob" },
   {
+    guess: undefined,
+    hint: undefined,
+    id: "2",
+    isTyping: false,
+    name: "Alice",
+  },
+  {
+    guess: undefined,
     hint: "they wish to introduce you to the lord and savior",
     id: "3",
     isTyping: false,
