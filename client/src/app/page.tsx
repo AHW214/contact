@@ -1,6 +1,8 @@
 // TODO
 "use client";
 
+import { Codec } from "purify-ts/Codec";
+import * as C from "purify-ts/Codec";
 import { type Ref, useEffect, useRef, useState } from "react";
 import useWebSocket from "react-use-websocket";
 
@@ -10,6 +12,10 @@ import WordDisplay, { type TargetWord } from "./components/word-display";
 import Wordmaster from "./components/wordmaster";
 
 type Action = { tag: "contact"; player: string } | { tag: "hint" };
+
+type InboundMessage =
+  | { tag: "hint"; description: string; player: string }
+  | { tag: "contact"; player: string };
 
 type OutboundMessage =
   | { tag: "contact"; player: string; word: string }
@@ -35,6 +41,15 @@ const MOCK_PLAYERS = [
   },
 ];
 
+const inboundMessageCodec: Codec<InboundMessage> = C.oneOf([
+  Codec.interface({
+    tag: C.exactly("hint"),
+    description: C.string,
+    player: C.string,
+  }),
+  Codec.interface({ tag: C.exactly("contact"), player: C.string }),
+]);
+
 export default function Home() {
   const inputRef: Ref<HTMLInputElement> = useRef(null);
 
@@ -55,7 +70,16 @@ export default function Home() {
 
   useEffect(() => {
     if (lastMessage !== null) {
-      console.log(`last message: ${lastMessage}`);
+      console.log(`last message: ${lastMessage.data}`);
+
+      const messageJson = JSON.parse(lastMessage.data);
+
+      const toLog = inboundMessageCodec.decode(messageJson).caseOf({
+        Left: (err) => `bad inbound message: ${err}`,
+        Right: (msg) => `good inbound message!: ${msg}`,
+      });
+
+      console.log(toLog);
     }
   }, [lastMessage]);
 
