@@ -3,10 +3,12 @@
 
 import { type Ref, useRef, useState } from "react";
 
-import Input from "./components/Input";
-import Player, * as P from "./components/Player";
+import Input from "./components/input";
+import Player from "./components/player";
+import WordDisplay, { type TargetWord } from "./components/word-display";
+import Wordmaster from "./components/wordmaster";
 
-type TargetWord = { status: "guessing" | "unveiled"; word: string };
+type Action = "contact" | "guess";
 
 type WordHintMessage = {
   playerId: string;
@@ -16,15 +18,6 @@ type WordHintMessage = {
 type WordGuessMessage = {
   playerId: string;
   guess: string;
-};
-
-type WordDisplayProps = {
-  target: TargetWord;
-};
-
-type WordmasterProps = {
-  id: string;
-  name: string;
 };
 
 const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
@@ -49,7 +42,10 @@ const MOCK_PLAYERS = [
 
 export default function Home() {
   const inputRef: Ref<HTMLInputElement> = useRef(null);
-  const [guess, setGuess] = useState<string>("");
+  const [currentInput, setCurrentInput] = useState<string>("");
+  const [action, setAction] = useState<Action>("contact");
+
+  const onEnter = action === "contact" ? () => {} : () => {};
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
@@ -62,46 +58,21 @@ export default function Home() {
               <Player
                 key={props.id}
                 inputRef={inputRef}
-                guess={guess}
+                guess={currentInput}
                 {...props}
               />
             ))}
           </div>
-          <Input ref={inputRef} onChange={(ev) => setGuess(ev.target.value)} />
+          <Input
+            ref={inputRef}
+            onChange={(ev) => setCurrentInput(ev.target.value)}
+            onEnter={onEnter}
+          />
         </div>
       </main>
       <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
         footer
       </footer>
-    </div>
-  );
-}
-
-function WordDisplay({ target }: WordDisplayProps) {
-  return (
-    <div className="flex gap-2">
-      {target.word.split("").map((letter, ix) => (
-        <div
-          className="p-2 w-16 border-2 border-zinc-800 rounded-lg bg-zinc-800 text-6xl text-zinc-100 font-light uppercase text-center"
-          key={ix}
-        >
-          {letter}
-        </div>
-      ))}
-      {target.status === "guessing" ? (
-        <div className="p-2 text-6xl font-light tracking-[1.5rem]">...</div>
-      ) : undefined}
-    </div>
-  );
-}
-
-function Wordmaster({ name }: WordmasterProps) {
-  return (
-    <div className="px-0 pt-0 w-40 h-16 p-2 border-2 border-zinc-800 rounded-lg bg-zinc-800 text-zinc-100">
-      <div className="w-fit -mx-[.125rem] -mt-[.125rem] px-2 border-2 border-zinc-600 border-l-zinc-800 border-t-zinc-800 rounded-tl-lg rounded-br-lg ">
-        <h3>{name}</h3>
-      </div>
-      <p className="ml-2">placeholder</p>
     </div>
   );
 }

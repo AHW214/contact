@@ -19,37 +19,30 @@ export default function Player({
   isTyping,
   name,
 }: Props) {
-  const { classes, coverText, onClick } =
+  const { classes, onClick } =
     hint !== undefined && hint !== ""
       ? {
-          classes: { cursor: "cursor-pointer", visibility: "visible" },
-          ...(guess !== undefined && guess !== ""
-            ? {
-                coverText: "contact",
-                onClick: () => alert(`contact! you guessed: ${guess}`),
-              }
-            : {
-                coverText: "guess",
-                onClick: () => {
-                  // TODO - DOES NOTHING - does ref exist?
-                  inputRef.current?.focus();
-                  inputRef.current?.select();
-                },
-              }),
+          classes: {
+            cursor: "cursor-pointer",
+            visibility: "group-hover:visible",
+          },
+          onClick: () => {
+            inputRef.current?.focus();
+            inputRef.current?.select();
+          },
         }
       : {
-          classes: { cursor: "auto", visibility: "invisible" },
-          coverText: "",
+          classes: { cursor: "auto", visibility: "group-hover:invisible" },
           onClick: () => {},
         };
 
   return (
     <div key={id} className="relative group" onClick={onClick}>
       <div
-        className={`absolute top-0 left-0 w-full h-full flex items-center justify-center rounded-lg bg-zinc-800 invisible group-hover:${classes.visibility}`}
+        className={`absolute top-0 left-0 w-full h-full flex items-center justify-center rounded-lg bg-zinc-800 invisible ${classes.visibility}`}
       >
         <h3 className="text-zinc-100 text-center text-4xl uppercase">
-          {coverText}
+          contact
         </h3>
       </div>
       <div
