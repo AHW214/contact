@@ -1,6 +1,5 @@
 import {
   type ChangeEventHandler,
-  type KeyboardEvent,
   type KeyboardEventHandler,
   forwardRef,
 } from "react";
@@ -8,11 +7,13 @@ import {
 export type Props = {
   onChange: ChangeEventHandler<HTMLInputElement>;
   onEnter: KeyboardEventHandler<HTMLInputElement>;
+  placeholder: string;
+  value: string;
 };
 
 const Input = forwardRef<HTMLInputElement, Props>(
-  ({ onChange, onEnter }, ref) => {
-    const onKeyDown = (ev: KeyboardEvent<HTMLInputElement>) => {
+  ({ onChange, onEnter, placeholder, value }, ref) => {
+    const onKeyDown: KeyboardEventHandler<HTMLInputElement> = (ev) => {
       if (ev.key === "Enter") {
         onEnter(ev);
       }
@@ -23,8 +24,9 @@ const Input = forwardRef<HTMLInputElement, Props>(
         className="p-1 min-w-96 border-2 border-zinc-300 rounded-lg focus:outline-zinc-800"
         onChange={onChange}
         onKeyDown={onKeyDown}
-        placeholder="guess here..."
+        placeholder={placeholder}
         ref={ref}
+        value={value}
       ></input>
     );
   }
