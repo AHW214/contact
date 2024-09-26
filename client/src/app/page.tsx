@@ -11,50 +11,85 @@ import Player from "./components/player";
 import WordDisplay, { type TargetWord } from "./components/word-display";
 import Wordmaster from "./components/wordmaster";
 
-type Action = { tag: "contact"; player: string } | { tag: "hint" };
+type Player = {
+  hint: string | undefined;
+  id: string;
+  isTyping: boolean;
+  name: string;
+};
+
+type Action =
+  | { tag: "contact"; player: { id: string; name: string } }
+  | { tag: "hint" };
 
 type InboundMessage =
-  | { tag: "hint"; description: string; player: string }
-  | { tag: "contact"; player: string };
+  | { tag: "hint"; description: string; playerId: string }
+  | { tag: "contact"; playerId: string };
 
 type OutboundMessage =
-  | { tag: "contact"; player: string; word: string }
+  | { tag: "contact"; playerId: string; word: string }
   | { tag: "hint"; description: string };
 
 const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
-const MOCK_PLAYERS = [
-  { hint: undefined, id: "1", isTyping: true, name: "Bob" },
-  {
-    hint: undefined,
-    id: "2",
-    isTyping: false,
-    name: "Alice",
-  },
-  {
-    hint: "they wish to introduce you to the lord and savior",
-    id: "3",
-    isTyping: false,
-    name: "Gandalf",
-  },
-];
+const MOCK_PLAYERS = new Map<string, Player>([
+  ["1", { hint: undefined, id: "1", isTyping: true, name: "Bob" }],
+  [
+    "2",
+    {
+      hint: undefined,
+      id: "2",
+      isTyping: false,
+      name: "Alice",
+    },
+  ],
+  [
+    "3",
+    {
+      hint: undefined,
+      id: "3",
+      isTyping: false,
+      name: "Gandalf",
+    },
+  ],
+]);
 
 const inboundMessageCodec: Codec<InboundMessage> = C.oneOf([
   Codec.interface({
     tag: C.exactly("hint"),
     description: C.string,
-    player: C.string,
+    playerId: C.string,
   }),
-  Codec.interface({ tag: C.exactly("contact"), player: C.string }),
+  Codec.interface({ tag: C.exactly("contact"), playerId: C.string }),
 ]);
+
+const tryParseJSON = (value: any): string | undefined => {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+};
 
 export default function Home() {
   const inputRef: Ref<HTMLInputElement> = useRef(null);
 
   const [currentInput, setCurrentInput] = useState<string>("");
   const [action, setAction] = useState<Action>({ tag: "hint" });
+  const [players, setPlayers] = useState<Map<string, Player>>(MOCK_PLAYERS);
+
+  const handleInboundMessage = (message: InboundMessage): void => {
+    if (message.tag === "hint") {
+      const player = players.get(message.playerId);
+
+      if (player !== undefined) {
+        const updatedPlayer = { ...player, hint: message.description };
+        setPlayers(new Map([...players, [player.id, updatedPlayer]]));
+      }
+    }
+  };
 
   const WEB_SOCKET_URL = "ws://localhost:1234";
 
@@ -72,14 +107,17 @@ export default function Home() {
     if (lastMessage !== null) {
       console.log(`last message: ${lastMessage.data}`);
 
-      const messageJson = JSON.parse(lastMessage.data);
+      const messageJson = tryParseJSON(lastMessage.data);
 
-      const toLog = inboundMessageCodec.decode(messageJson).caseOf({
-        Left: (err) => `bad inbound message: ${err}`,
-        Right: (msg) => `good inbound message!: ${msg}`,
+      inboundMessageCodec.decode(messageJson).caseOf({
+        Left: (err) => {
+          console.log(`bad inbound message: ${err}`);
+        },
+
+        Right: (msg) => {
+          handleInboundMessage(msg);
+        },
       });
-
-      console.log(toLog);
     }
   }, [lastMessage]);
 
@@ -90,19 +128,21 @@ export default function Home() {
           <WordDisplay target={MOCK_TARGET_WORD} />
           <Wordmaster id="0" name={MOCK_WORDMASTER} />
           <div className="flex gap-2">
-            {MOCK_PLAYERS.map((props) => (
+            {[...players].map(([, player]) => (
               <Player
-                key={props.id}
+                key={player.id}
                 inputRef={inputRef}
-                guess={currentInput}
                 onClickCancel={() => {
                   setAction({ tag: "hint" });
                   setCurrentInput("");
                 }}
                 onClickContact={() =>
-                  setAction({ tag: "contact", player: props.name })
+                  setAction({
+                    tag: "contact",
+                    player: { id: player.id, name: player.name },
+                  })
                 }
-                {...props}
+                {...player}
               />
             ))}
           </div>
@@ -111,7 +151,7 @@ export default function Home() {
               {currentInput === ""
                 ? "words, words, words..."
                 : action.tag === "contact"
-                ? `press enter to contact with ${action.player}`
+                ? `press enter to contact with ${action.player.name}`
                 : "press enter to share your hint with everyone"}
             </h3>
             <Input
@@ -122,7 +162,7 @@ export default function Home() {
                   action.tag === "contact"
                     ? {
                         tag: "contact",
-                        player: action.player,
+                        playerId: action.player.id,
                         word: currentInput,
                       }
                     : { tag: "hint", description: currentInput };

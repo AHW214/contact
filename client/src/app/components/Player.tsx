@@ -3,7 +3,6 @@
 import { type MouseEventHandler, type RefObject, useState } from "react";
 
 export type Props = {
-  guess: string | undefined;
   hint: string | undefined;
   id: string;
   inputRef: RefObject<HTMLInputElement>;
@@ -14,7 +13,6 @@ export type Props = {
 };
 
 export default function Player({
-  guess,
   hint,
   id,
   inputRef,
