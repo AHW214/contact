@@ -1,7 +1,8 @@
 // TODO
 "use client";
 
-import { type Ref, useRef, useState } from "react";
+import { type Ref, useEffect, useRef, useState } from "react";
+import useWebSocket from "react-use-websocket";
 
 import Input from "./components/input";
 import Player from "./components/player";
@@ -10,15 +11,9 @@ import Wordmaster from "./components/wordmaster";
 
 type Action = { tag: "contact"; player: string } | { tag: "hint" };
 
-type WordHintMessage = {
-  playerId: string;
-  hint: string;
-};
-
-type WordGuessMessage = {
-  playerId: string;
-  guess: string;
-};
+type OutboundMessage =
+  | { tag: "contact"; player: string; word: string }
+  | { tag: "hint"; description: string };
 
 const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 
@@ -42,8 +37,27 @@ const MOCK_PLAYERS = [
 
 export default function Home() {
   const inputRef: Ref<HTMLInputElement> = useRef(null);
+
   const [currentInput, setCurrentInput] = useState<string>("");
   const [action, setAction] = useState<Action>({ tag: "hint" });
+
+  const WEB_SOCKET_URL = "ws://localhost:1234";
+
+  // TODO: check readystate and display loading screen if not yet connected etc
+  const {
+    sendMessage,
+    lastMessage,
+    readyState: _readyState,
+  } = useWebSocket(WEB_SOCKET_URL);
+
+  const sendServer = (message: OutboundMessage): void =>
+    sendMessage(JSON.stringify(message));
+
+  useEffect(() => {
+    if (lastMessage !== null) {
+      console.log(`last message: ${lastMessage}`);
+    }
+  }, [lastMessage]);
 
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
@@ -80,8 +94,16 @@ export default function Home() {
               ref={inputRef}
               onChange={(ev) => setCurrentInput(ev.target.value)}
               onEnter={() => {
-                const thing = `${action.tag}: ${currentInput}`;
-                alert(thing);
+                const message: OutboundMessage =
+                  action.tag === "contact"
+                    ? {
+                        tag: "contact",
+                        player: action.player,
+                        word: currentInput,
+                      }
+                    : { tag: "hint", description: currentInput };
+
+                sendServer(message);
               }}
               placeholder={
                 action.tag === "contact"
