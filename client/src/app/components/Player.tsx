@@ -2,7 +2,10 @@
 
 import { type MouseEventHandler, type RefObject, useState } from "react";
 
+export type ContactState = "declared" | "failed" | "succeeded";
+
 export type Props = {
+  contactState: ContactState | undefined;
   hint: string | undefined;
   id: string;
   inputRef: RefObject<HTMLInputElement>;
@@ -13,6 +16,7 @@ export type Props = {
 };
 
 export default function Player({
+  contactState,
   hint,
   id,
   inputRef,
@@ -26,12 +30,28 @@ export default function Player({
   const classes =
     hint !== undefined && hint !== ""
       ? {
-          borderColor: isSelected ? "border-zinc-800" : "border-zinc-300",
+          borderColor:
+            contactState === "failed"
+              ? "border-red-800"
+              : contactState === "succeeded"
+              ? "border-green-800"
+              : contactState === "declared"
+              ? "border-blue-800"
+              : isSelected
+              ? "border-zinc-800"
+              : "border-zinc-300",
           cursor: "cursor-pointer",
           visibility: "group-hover:visible",
         }
       : {
-          borderColor: "border-zinc-300",
+          borderColor:
+            contactState === "failed"
+              ? "border-red-800"
+              : contactState === "succeeded"
+              ? "border-green-800"
+              : contactState === "declared"
+              ? "border-blue-800"
+              : "border-zinc-300",
           cursor: "auto",
           visibility: "group-hover:invisible",
         };

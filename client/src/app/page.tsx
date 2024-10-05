@@ -7,11 +7,12 @@ import { type Ref, useEffect, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 
 import Input from "./components/input";
-import Player from "./components/player";
+import Player, { type ContactState } from "./components/player";
 import WordDisplay, { type TargetWord } from "./components/word-display";
 import Wordmaster from "./components/wordmaster";
 
 type Player = {
+  contactState: ContactState | undefined;
   hint: string | undefined;
   id: string;
   isTyping: boolean;
@@ -24,7 +25,16 @@ type Action =
 
 type InboundMessage =
   | { tag: "hint"; description: string; playerId: string }
-  | { tag: "contact"; playerId: string };
+  | { tag: "declareContact"; players: { fromId: string; toId: string } }
+  | {
+      // TODO - separate messages for failed and successful contacts?
+      tag: "revealContact";
+      players: {
+        from: { id: string; word: string };
+        to: { id: string; word: string };
+      };
+      success: boolean;
+    };
 
 type OutboundMessage =
   | { tag: "contact"; playerId: string; word: string }
@@ -35,10 +45,20 @@ const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
 const MOCK_PLAYERS = new Map<string, Player>([
-  ["1", { hint: undefined, id: "1", isTyping: true, name: "Bob" }],
+  [
+    "1",
+    {
+      contactState: undefined,
+      hint: undefined,
+      id: "1",
+      isTyping: true,
+      name: "Bob",
+    },
+  ],
   [
     "2",
     {
+      contactState: undefined,
       hint: "spaghetti",
       id: "2",
       isTyping: false,
@@ -48,6 +68,7 @@ const MOCK_PLAYERS = new Map<string, Player>([
   [
     "3",
     {
+      contactState: undefined,
       hint: undefined,
       id: "3",
       isTyping: false,
@@ -56,13 +77,25 @@ const MOCK_PLAYERS = new Map<string, Player>([
   ],
 ]);
 
+// TODO - refactor duplicate codec parts
 const inboundMessageCodec: Codec<InboundMessage> = C.oneOf([
   Codec.interface({
     tag: C.exactly("hint"),
     description: C.string,
     playerId: C.string,
   }),
-  Codec.interface({ tag: C.exactly("contact"), playerId: C.string }),
+  Codec.interface({
+    tag: C.exactly("declareContact"),
+    players: Codec.interface({ fromId: C.string, toId: C.string }),
+  }),
+  Codec.interface({
+    tag: C.exactly("revealContact"),
+    players: Codec.interface({
+      from: Codec.interface({ id: C.string, word: C.string }),
+      to: Codec.interface({ id: C.string, word: C.string }),
+    }),
+    success: C.boolean,
+  }),
 ]);
 
 const tryParseJSON = (value: any): string | undefined => {
@@ -98,12 +131,56 @@ export default function Home() {
   const [players, setPlayers] = useState<Map<string, Player>>(MOCK_PLAYERS);
 
   const handleInboundMessage = (message: InboundMessage): void => {
+    // TODO - much redundant code
+
     if (message.tag === "hint") {
       const player = players.get(message.playerId);
 
       if (player !== undefined) {
         const updatedPlayer = { ...player, hint: message.description };
         setPlayers(new Map([...players, [player.id, updatedPlayer]]));
+      }
+    } else if (message.tag === "declareContact") {
+      const fromPlayer = players.get(message.players.fromId);
+      const toPlayer = players.get(message.players.toId);
+
+      if (fromPlayer !== undefined && toPlayer !== undefined) {
+        const updatedPlayers: Player[] = [fromPlayer, toPlayer].map(
+          (player) => ({
+            ...player,
+            contactState: "declared",
+          })
+        );
+
+        setPlayers(
+          new Map([
+            ...players,
+            ...updatedPlayers.map<[string, Player]>((p) => [p.id, p]),
+          ])
+        );
+      }
+    } else if (message.tag === "revealContact") {
+      const fromPlayer = players.get(message.players.from.id);
+      const toPlayer = players.get(message.players.to.id);
+
+      if (fromPlayer !== undefined && toPlayer !== undefined) {
+        const contactState = message.success ? "succeeded" : "failed";
+
+        const updatedPlayers: Player[] = [
+          { player: fromPlayer, msg: message.players.from },
+          { player: toPlayer, msg: message.players.to },
+        ].map(({ player, msg }) => ({
+          ...player,
+          hint: msg.word,
+          contactState,
+        }));
+
+        setPlayers(
+          new Map([
+            ...players,
+            ...updatedPlayers.map<[string, Player]>((p) => [p.id, p]),
+          ])
+        );
       }
     }
   };
