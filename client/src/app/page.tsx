@@ -4,7 +4,7 @@
 import { Codec } from "purify-ts/Codec";
 import * as C from "purify-ts/Codec";
 import { type Ref, useEffect, useRef, useState } from "react";
-import useWebSocket from "react-use-websocket";
+import useWebSocket, { ReadyState } from "react-use-websocket";
 
 import Input from "./components/input";
 import Player from "./components/player";
@@ -39,7 +39,7 @@ const MOCK_PLAYERS = new Map<string, Player>([
   [
     "2",
     {
-      hint: undefined,
+      hint: "spaghetti",
       id: "2",
       isTyping: false,
       name: "Alice",
@@ -73,6 +73,23 @@ const tryParseJSON = (value: any): string | undefined => {
   }
 };
 
+const showWebSocketState = (readyState: ReadyState): string => {
+  switch (readyState) {
+    case ReadyState.CLOSED:
+      return "closed";
+    case ReadyState.CLOSING:
+      return "closing";
+    case ReadyState.CONNECTING:
+      return "connecting";
+    case ReadyState.OPEN:
+      return "open";
+    case ReadyState.UNINSTANTIATED:
+      return "uninstantiated";
+    default:
+      return "unknown";
+  }
+};
+
 export default function Home() {
   const inputRef: Ref<HTMLInputElement> = useRef(null);
 
@@ -94,11 +111,7 @@ export default function Home() {
   const WEB_SOCKET_URL = "ws://localhost:1234";
 
   // TODO: check readystate and display loading screen if not yet connected etc
-  const {
-    sendMessage,
-    lastMessage,
-    readyState: _readyState,
-  } = useWebSocket(WEB_SOCKET_URL);
+  const { sendMessage, lastMessage, readyState } = useWebSocket(WEB_SOCKET_URL);
 
   const sendServer = (message: OutboundMessage): void =>
     sendMessage(JSON.stringify(message));
@@ -124,60 +137,64 @@ export default function Home() {
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <div className="flex flex-col gap-8 items-center">
-          <WordDisplay target={MOCK_TARGET_WORD} />
-          <Wordmaster id="0" name={MOCK_WORDMASTER} />
-          <div className="flex gap-2">
-            {[...players].map(([, player]) => (
-              <Player
-                key={player.id}
-                inputRef={inputRef}
-                onClickCancel={() => {
-                  setAction({ tag: "hint" });
-                  setCurrentInput("");
-                }}
-                onClickContact={() =>
-                  setAction({
-                    tag: "contact",
-                    player: { id: player.id, name: player.name },
-                  })
-                }
-                {...player}
-              />
-            ))}
-          </div>
-          <div className="flex flex-col gap-1">
-            <h3 className="text-zinc-400 text-sm">
-              {currentInput === ""
-                ? "words, words, words..."
-                : action.tag === "contact"
-                ? `press enter to contact with ${action.player.name}`
-                : "press enter to share your hint with everyone"}
-            </h3>
-            <Input
-              ref={inputRef}
-              onChange={(ev) => setCurrentInput(ev.target.value)}
-              onEnter={() => {
-                const message: OutboundMessage =
-                  action.tag === "contact"
-                    ? {
-                        tag: "contact",
-                        playerId: action.player.id,
-                        word: currentInput,
-                      }
-                    : { tag: "hint", description: currentInput };
+        {readyState !== ReadyState.OPEN ? (
+          <div>websocket state: {showWebSocketState(readyState)}</div>
+        ) : (
+          <div className="flex flex-col gap-8 items-center">
+            <WordDisplay target={MOCK_TARGET_WORD} />
+            <Wordmaster id="0" name={MOCK_WORDMASTER} />
+            <div className="flex gap-2">
+              {[...players].map(([, player]) => (
+                <Player
+                  key={player.id}
+                  inputRef={inputRef}
+                  onClickCancel={() => {
+                    setAction({ tag: "hint" });
+                    setCurrentInput("");
+                  }}
+                  onClickContact={() =>
+                    setAction({
+                      tag: "contact",
+                      player: { id: player.id, name: player.name },
+                    })
+                  }
+                  {...player}
+                />
+              ))}
+            </div>
+            <div className="flex flex-col gap-1">
+              <h3 className="text-zinc-400 text-sm">
+                {currentInput === ""
+                  ? "words, words, words..."
+                  : action.tag === "contact"
+                  ? `press enter to contact with ${action.player.name}`
+                  : "press enter to share your hint with everyone"}
+              </h3>
+              <Input
+                ref={inputRef}
+                onChange={(ev) => setCurrentInput(ev.target.value)}
+                onEnter={() => {
+                  const message: OutboundMessage =
+                    action.tag === "contact"
+                      ? {
+                          tag: "contact",
+                          playerId: action.player.id,
+                          word: currentInput,
+                        }
+                      : { tag: "hint", description: currentInput };
 
-                sendServer(message);
-              }}
-              placeholder={
-                action.tag === "contact"
-                  ? "type your guess here..."
-                  : "type your hint here..."
-              }
-              value={currentInput}
-            />
+                  sendServer(message);
+                }}
+                placeholder={
+                  action.tag === "contact"
+                    ? "type your guess here..."
+                    : "type your hint here..."
+                }
+                value={currentInput}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </main>
       <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
         footer
