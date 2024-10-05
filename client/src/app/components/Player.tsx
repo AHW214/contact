@@ -59,7 +59,7 @@ export default function Player({
         className={`absolute top-0 left-0 w-full h-full flex items-center justify-center rounded-lg bg-zinc-800 invisible ${classes.visibility}`}
         onClick={onClick}
       >
-        <h3 className="text-zinc-100 text-center text-4xl uppercase">
+        <h3 className="text-zinc-100 text-center text-3xl uppercase">
           {coverText}
         </h3>
       </div>
