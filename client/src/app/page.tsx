@@ -1,60 +1,57 @@
 // TODO
 "use client";
 
-import type { WithBrand } from "@coderspirit/nominal";
 import { type Either, Left, Right } from "purify-ts";
 import { Codec } from "purify-ts/Codec";
 import * as C from "purify-ts/Codec";
 import { type Ref, useEffect, useReducer, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 
-import Input from "./components/input";
-import Player, { type ContactState } from "./components/player";
-import WordDisplay, { type TargetWord } from "./components/word-display";
-import Wordmaster from "./components/wordmaster";
-
-namespace Player {
-  export type Id = WithBrand<string, "Player">;
-}
-
-type Player = {
-  contactState: ContactState | undefined;
-  hint: string | undefined;
-  id: Player.Id;
-  isTyping: boolean;
-  name: string;
-};
+import Input from "contact/app/components/input";
+// TODO - import naming conflict things
+import PlayerView from "contact/app/components/player";
+import WordDisplay, {
+  type TargetWord,
+} from "contact/app/components/word-display";
+import Wordmaster from "contact/app/components/wordmaster";
+import {
+  type Player,
+  type PlayerId,
+  playerIdCodec,
+} from "contact/app/data/player";
+import * as Record from "contact/app/util/record";
 
 type Action =
-  | { tag: "contact"; player: { id: string; name: string } }
+  | { tag: "contact"; player: { id: PlayerId; name: string } }
   | { tag: "hint" };
 
 type Model = {
   currentAction: Action;
   currentInput: string;
-  players: Record<Player.Id, Player>;
+  players: Record<PlayerId, Player>;
 };
 
 type Msg =
+  | { tag: "changedInput"; value: string }
   | { tag: "clickedCancel" }
-  | { tag: "clickedContact"; player: { id: string; name: string } }
+  | { tag: "clickedContact"; player: { id: PlayerId; name: string } }
   | { tag: "webSocketMessage"; data: unknown };
 
 type InboundMessage =
-  | { tag: "hint"; description: string; playerId: string }
-  | { tag: "declareContact"; players: { fromId: string; toId: string } }
+  | { tag: "hint"; description: string; playerId: PlayerId }
+  | { tag: "declareContact"; players: { fromId: PlayerId; toId: PlayerId } }
   | {
       // TODO - separate messages for failed and successful contacts?
       tag: "revealContact";
       players: {
-        from: { id: string; word: string };
-        to: { id: string; word: string };
+        from: { id: PlayerId; word: string };
+        to: { id: PlayerId; word: string };
       };
       success: boolean;
     };
 
 type OutboundMessage =
-  | { tag: "contact"; playerId: string; word: string }
+  | { tag: "contact"; playerId: PlayerId; word: string }
   | { tag: "hint"; description: string };
 
 type MockPlayerParams = {
@@ -65,12 +62,12 @@ type MockPlayerParams = {
 const mockPlayer = ({ id, name }: MockPlayerParams): Player => ({
   contactState: undefined,
   hint: undefined,
-  id: id as Player.Id,
+  id: id as PlayerId,
   isTyping: false,
   name,
 });
 
-const mockPlayerMap = (names: string[]): Record<Player.Id, Player> => {
+const mockPlayerMap = (names: string[]): Record<PlayerId, Player> => {
   const players = names.map((name, ix) => mockPlayer({ id: `${ix}`, name }));
   return Object.fromEntries(players.map((player) => [player.id, player]));
 };
@@ -79,7 +76,7 @@ const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
-const MOCK_PLAYERS: Record<Player.Id, Player> = mockPlayerMap([
+const MOCK_PLAYERS: Record<PlayerId, Player> = mockPlayerMap([
   "Bob",
   "Alice",
   "Gandalf",
@@ -96,29 +93,21 @@ const inboundMessageCodec: Codec<InboundMessage> = C.oneOf([
   Codec.interface({
     tag: C.exactly("hint"),
     description: C.string,
-    playerId: C.string,
+    playerId: playerIdCodec,
   }),
   Codec.interface({
     tag: C.exactly("declareContact"),
-    players: Codec.interface({ fromId: C.string, toId: C.string }),
+    players: Codec.interface({ fromId: playerIdCodec, toId: playerIdCodec }),
   }),
   Codec.interface({
     tag: C.exactly("revealContact"),
     players: Codec.interface({
-      from: Codec.interface({ id: C.string, word: C.string }),
-      to: Codec.interface({ id: C.string, word: C.string }),
+      from: Codec.interface({ id: playerIdCodec, word: C.string }),
+      to: Codec.interface({ id: playerIdCodec, word: C.string }),
     }),
     success: C.boolean,
   }),
 ]);
-
-const tryParseJSON = (value: any): string | undefined => {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return undefined;
-  }
-};
 
 const showWebSocketState = (readyState: ReadyState): string => {
   switch (readyState) {
@@ -150,40 +139,11 @@ const parseWebSocketData = (data: unknown): Either<string, InboundMessage> => {
   }
 };
 
-namespace Record {
-  export const updateWithData = <K extends string | number | symbol, V, T>(
-    record: Record<K, V>,
-    keysAndData: [K, T][],
-    updateFn: (value: V, data: T) => V
-  ): Record<K, V> => {
-    const entries = keysAndData.reduce<[K, [V, T]][]>((acc, [key, data]) => {
-      const value = record[key];
-      const entry: [K, [V, T]] = [key, [value, data]];
-      return value !== undefined ? [...acc, entry] : acc;
-    }, []);
-
-    if (entries.length !== keysAndData.length) {
-      return record;
-    }
-
-    return entries.reduce(
-      (acc, [key, [value, data]]) => ({ ...acc, [key]: updateFn(value, data) }),
-      record
-    );
-  };
-
-  export const update = <K extends string | number | symbol, V>(
-    record: Record<K, V>,
-    keys: K[],
-    updateFn: (value: V) => V
-  ): Record<K, V> => {
-    const keysAndData: [K, undefined][] = keys.map((key) => [key, undefined]);
-    return updateWithData(record, keysAndData, updateFn);
-  };
-}
-
 const update = (model: Model, msg: Msg): Model => {
   switch (msg.tag) {
+    case "changedInput":
+      return { ...model, currentInput: msg.value };
+
     case "clickedCancel":
       return { ...model, currentAction: { tag: "hint" }, currentInput: "" };
 
@@ -203,48 +163,48 @@ const update = (model: Model, msg: Msg): Model => {
         Right: (message) => {
           switch (message.tag) {
             case "hint":
-              const newPlayers = Record.update(
-                model.players,
-                [message.playerId] as Player.Id[],
-                (player) => {
-                  return { ...player, hint: message.description };
-                }
-              );
-
-              return { ...model, players: newPlayers };
+              return {
+                ...model,
+                players: Record.update(
+                  model.players,
+                  [message.playerId],
+                  (player) => {
+                    return { ...player, hint: message.description };
+                  }
+                ),
+              };
 
             case "declareContact":
-              const newPlayers2 = Record.update(
-                model.players,
-                [message.players.fromId, message.players.toId] as Player.Id[],
-                (player): Player => {
-                  return { ...player, contactState: "declared" };
-                }
-              );
-
-              return { ...model, players: newPlayers2 };
+              return {
+                ...model,
+                players: Record.update(
+                  model.players,
+                  [message.players.fromId, message.players.toId],
+                  (player): Player => {
+                    return { ...player, contactState: "declared" };
+                  }
+                ),
+              };
 
             case "revealContact":
               const contactState = message.success ? "succeeded" : "failed";
 
-              const newPlayers3 = Record.updateWithData(
-                model.players,
-                [
+              return {
+                ...model,
+                players: Record.updateWithData(
+                  model.players,
                   [
-                    message.players.from.id as Player.Id,
-                    message.players.from.word,
+                    [message.players.from.id, message.players.from.word],
+                    [message.players.to.id, message.players.to.word],
                   ],
-                  [message.players.to.id as Player.Id, message.players.to.word],
-                ],
-                (player, word): Player => {
-                  return { ...player, hint: word, contactState };
-                }
-              );
-
-              return { ...model, players: newPlayers3 };
+                  (player, word): Player => {
+                    return { ...player, hint: word, contactState };
+                  }
+                ),
+              };
 
             default:
-              console.error("UNKNOWN MESSAGE");
+              console.error(`useReducer(): UNKNOWN MESSAGE '${msg.tag}'`);
               return model;
           }
         },
@@ -258,66 +218,7 @@ const update = (model: Model, msg: Msg): Model => {
 export default function Home() {
   const inputRef: Ref<HTMLInputElement> = useRef(null);
 
-  const [currentInput, setCurrentInput] = useState<string>("");
-  const [action, setAction] = useState<Action>({ tag: "hint" });
-  const [players, setPlayers] = useState<Map<string, Player>>(new Map());
-
   const [model, dispatch] = useReducer(update, MOCK_MODEL);
-
-  const handleInboundMessage = (message: InboundMessage): void => {
-    // TODO - much redundant code
-
-    if (message.tag === "hint") {
-      const player = players.get(message.playerId);
-
-      if (player !== undefined) {
-        const updatedPlayer = { ...player, hint: message.description };
-        setPlayers(new Map([...players, [player.id, updatedPlayer]]));
-      }
-    } else if (message.tag === "declareContact") {
-      const fromPlayer = players.get(message.players.fromId);
-      const toPlayer = players.get(message.players.toId);
-
-      if (fromPlayer !== undefined && toPlayer !== undefined) {
-        const updatedPlayers: Player[] = [fromPlayer, toPlayer].map(
-          (player) => ({
-            ...player,
-            contactState: "declared",
-          })
-        );
-
-        setPlayers(
-          new Map([
-            ...players,
-            ...updatedPlayers.map<[string, Player]>((p) => [p.id, p]),
-          ])
-        );
-      }
-    } else if (message.tag === "revealContact") {
-      const fromPlayer = players.get(message.players.from.id);
-      const toPlayer = players.get(message.players.to.id);
-
-      if (fromPlayer !== undefined && toPlayer !== undefined) {
-        const contactState = message.success ? "succeeded" : "failed";
-
-        const updatedPlayers: Player[] = [
-          { player: fromPlayer, msg: message.players.from },
-          { player: toPlayer, msg: message.players.to },
-        ].map(({ player, msg }) => ({
-          ...player,
-          hint: msg.word,
-          contactState,
-        }));
-
-        setPlayers(
-          new Map([
-            ...players,
-            ...updatedPlayers.map<[string, Player]>((p) => [p.id, p]),
-          ])
-        );
-      }
-    }
-  };
 
   const WEB_SOCKET_URL = "ws://localhost:1234";
 
@@ -330,18 +231,7 @@ export default function Home() {
   useEffect(() => {
     if (lastMessage !== null) {
       console.log(`last message: ${lastMessage.data}`);
-
-      const messageJson = tryParseJSON(lastMessage.data);
-
-      inboundMessageCodec.decode(messageJson).caseOf({
-        Left: (err) => {
-          console.log(`bad inbound message: ${err}`);
-        },
-
-        Right: (msg) => {
-          handleInboundMessage(msg);
-        },
-      });
+      dispatch({ tag: "webSocketMessage", data: lastMessage.data });
     }
   }, [lastMessage]);
 
@@ -355,18 +245,15 @@ export default function Home() {
             <WordDisplay target={MOCK_TARGET_WORD} />
             <Wordmaster id="0" name={MOCK_WORDMASTER} />
             <div className="flex gap-2">
-              {[...players].map(([, player]) => (
-                <Player
+              {Object.values(model.players).map((player) => (
+                <PlayerView
                   key={player.id}
                   inputRef={inputRef}
-                  onClickCancel={() => {
-                    setAction({ tag: "hint" });
-                    setCurrentInput("");
-                  }}
+                  onClickCancel={() => dispatch({ tag: "clickedCancel" })}
                   onClickContact={() =>
-                    setAction({
-                      tag: "contact",
-                      player: { id: player.id, name: player.name },
+                    dispatch({
+                      tag: "clickedContact",
+                      player,
                     })
                   }
                   {...player}
@@ -375,33 +262,35 @@ export default function Home() {
             </div>
             <div className="flex flex-col gap-1">
               <h3 className="text-zinc-400 text-sm">
-                {currentInput === ""
+                {model.currentInput === ""
                   ? "words, words, words..."
-                  : action.tag === "contact"
-                  ? `press enter to contact with ${action.player.name}`
+                  : model.currentAction.tag === "contact"
+                  ? `press enter to contact with ${model.currentAction.player.name}`
                   : "press enter to share your hint with everyone"}
               </h3>
               <Input
                 ref={inputRef}
-                onChange={(ev) => setCurrentInput(ev.target.value)}
+                onChange={(ev) =>
+                  dispatch({ tag: "changedInput", value: ev.target.value })
+                }
                 onEnter={() => {
                   const message: OutboundMessage =
-                    action.tag === "contact"
+                    model.currentAction.tag === "contact"
                       ? {
                           tag: "contact",
-                          playerId: action.player.id,
-                          word: currentInput,
+                          playerId: model.currentAction.player.id,
+                          word: model.currentInput,
                         }
-                      : { tag: "hint", description: currentInput };
+                      : { tag: "hint", description: model.currentInput };
 
                   sendServer(message);
                 }}
                 placeholder={
-                  action.tag === "contact"
+                  model.currentAction.tag === "contact"
                     ? "type your guess here..."
                     : "type your hint here..."
                 }
-                value={currentInput}
+                value={model.currentInput}
               />
             </div>
           </div>

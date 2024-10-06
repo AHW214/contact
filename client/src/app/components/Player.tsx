@@ -2,7 +2,7 @@
 
 import { type MouseEventHandler, type RefObject, useState } from "react";
 
-export type ContactState = "declared" | "failed" | "succeeded";
+import type { ContactState } from "contact/app/data/player";
 
 export type Props = {
   contactState: ContactState | undefined;
