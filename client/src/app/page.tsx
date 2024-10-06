@@ -2,6 +2,7 @@
 "use client";
 
 import type { WithBrand } from "@coderspirit/nominal";
+import { type Either, Left, Right } from "purify-ts";
 import { Codec } from "purify-ts/Codec";
 import * as C from "purify-ts/Codec";
 import { type Ref, useEffect, useReducer, useRef, useState } from "react";
@@ -37,7 +38,7 @@ type Model = {
 type Msg =
   | { tag: "clickedCancel" }
   | { tag: "clickedContact"; player: { id: string; name: string } }
-  | { tag: "websocketMessage"; received: string };
+  | { tag: "webSocketMessage"; data: unknown };
 
 type InboundMessage =
   | { tag: "hint"; description: string; playerId: string }
@@ -136,10 +137,62 @@ const showWebSocketState = (readyState: ReadyState): string => {
   }
 };
 
-const update = (model: Model, msg: undefined): Model => {
-  switch (msg) {
-    case undefined:
-      return model;
+const parseWebSocketData = (data: unknown): Either<string, InboundMessage> => {
+  if (typeof data !== "string") {
+    return Left("websocket data not string");
+  }
+
+  try {
+    const dataJson = JSON.parse(data);
+    return inboundMessageCodec.decode(dataJson);
+  } catch (err) {
+    return Left(`failed to parse websocket data: ${err}`);
+  }
+};
+
+const update = (model: Model, msg: Msg): Model => {
+  switch (msg.tag) {
+    case "clickedCancel":
+      return { ...model, currentAction: { tag: "hint" }, currentInput: "" };
+
+    case "clickedContact":
+      return {
+        ...model,
+        currentAction: { tag: "contact", player: msg.player },
+      };
+
+    case "webSocketMessage":
+      return parseWebSocketData(msg.data).caseOf({
+        Left: (err) => {
+          console.log(`bad websocket message: ${err}`);
+          return model;
+        },
+
+        Right: (message) => {
+          switch (message.tag) {
+            case "hint":
+              const player: Player | undefined =
+                model.players[message.playerId as Player.Id];
+
+              if (player === undefined) {
+                return model;
+              }
+
+              const newPlayer = { ...player, hint: message.description };
+              const newPlayers = { ...model.players, [player.id]: newPlayer };
+
+              return { ...model, players: newPlayers };
+
+            case "declareContact":
+            case "revealContact":
+              return model;
+
+            default:
+              return model;
+          }
+        },
+      });
+
     default:
       return model;
   }
