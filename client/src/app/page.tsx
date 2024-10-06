@@ -1,9 +1,10 @@
 // TODO
 "use client";
 
+import type { WithBrand } from "@coderspirit/nominal";
 import { Codec } from "purify-ts/Codec";
 import * as C from "purify-ts/Codec";
-import { type Ref, useEffect, useRef, useState } from "react";
+import { type Ref, useEffect, useReducer, useRef, useState } from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 
 import Input from "./components/input";
@@ -11,10 +12,14 @@ import Player, { type ContactState } from "./components/player";
 import WordDisplay, { type TargetWord } from "./components/word-display";
 import Wordmaster from "./components/wordmaster";
 
+namespace Player {
+  export type Id = WithBrand<string, "Player">;
+}
+
 type Player = {
   contactState: ContactState | undefined;
   hint: string | undefined;
-  id: string;
+  id: Player.Id;
   isTyping: boolean;
   name: string;
 };
@@ -22,6 +27,17 @@ type Player = {
 type Action =
   | { tag: "contact"; player: { id: string; name: string } }
   | { tag: "hint" };
+
+type Model = {
+  currentAction: Action;
+  currentInput: string;
+  players: Record<Player.Id, Player>;
+};
+
+type Msg =
+  | { tag: "clickedCancel" }
+  | { tag: "clickedContact"; player: { id: string; name: string } }
+  | { tag: "websocketMessage"; received: string };
 
 type InboundMessage =
   | { tag: "hint"; description: string; playerId: string }
@@ -40,42 +56,39 @@ type OutboundMessage =
   | { tag: "contact"; playerId: string; word: string }
   | { tag: "hint"; description: string };
 
+type MockPlayerParams = {
+  id: string;
+  name: string;
+};
+
+const mockPlayer = ({ id, name }: MockPlayerParams): Player => ({
+  contactState: undefined,
+  hint: undefined,
+  id: id as Player.Id,
+  isTyping: false,
+  name,
+});
+
+const mockPlayerMap = (names: string[]): Record<Player.Id, Player> => {
+  const players = names.map((name, ix) => mockPlayer({ id: `${ix}`, name }));
+  return Object.fromEntries(players.map((player) => [player.id, player]));
+};
+
 const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
-const MOCK_PLAYERS = new Map<string, Player>([
-  [
-    "1",
-    {
-      contactState: undefined,
-      hint: undefined,
-      id: "1",
-      isTyping: true,
-      name: "Bob",
-    },
-  ],
-  [
-    "2",
-    {
-      contactState: undefined,
-      hint: "spaghetti",
-      id: "2",
-      isTyping: false,
-      name: "Alice",
-    },
-  ],
-  [
-    "3",
-    {
-      contactState: undefined,
-      hint: undefined,
-      id: "3",
-      isTyping: false,
-      name: "Gandalf",
-    },
-  ],
+const MOCK_PLAYERS: Record<Player.Id, Player> = mockPlayerMap([
+  "Bob",
+  "Alice",
+  "Gandalf",
 ]);
+
+const MOCK_MODEL: Model = {
+  currentAction: { tag: "hint" },
+  currentInput: "",
+  players: MOCK_PLAYERS,
+};
 
 // TODO - refactor duplicate codec parts
 const inboundMessageCodec: Codec<InboundMessage> = C.oneOf([
@@ -123,12 +136,23 @@ const showWebSocketState = (readyState: ReadyState): string => {
   }
 };
 
+const update = (model: Model, msg: undefined): Model => {
+  switch (msg) {
+    case undefined:
+      return model;
+    default:
+      return model;
+  }
+};
+
 export default function Home() {
   const inputRef: Ref<HTMLInputElement> = useRef(null);
 
   const [currentInput, setCurrentInput] = useState<string>("");
   const [action, setAction] = useState<Action>({ tag: "hint" });
-  const [players, setPlayers] = useState<Map<string, Player>>(MOCK_PLAYERS);
+  const [players, setPlayers] = useState<Map<string, Player>>(new Map());
+
+  const [model, dispatch] = useReducer(update, MOCK_MODEL);
 
   const handleInboundMessage = (message: InboundMessage): void => {
     // TODO - much redundant code
