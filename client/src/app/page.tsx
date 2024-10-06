@@ -150,6 +150,27 @@ const parseWebSocketData = (data: unknown): Either<string, InboundMessage> => {
   }
 };
 
+const withValues = <K extends string | number | symbol, V>(
+  record: Record<K, V>,
+  keys: K[],
+  updateFn: (value: V) => V
+): Record<K, V> => {
+  const entries = keys.reduce<[K, V][]>((acc, key) => {
+    const value = record[key];
+    const entry: [K, V] = [key, value];
+    return value !== undefined ? [...acc, entry] : acc;
+  }, []);
+
+  if (entries.length !== keys.length) {
+    return record;
+  }
+
+  return entries.reduce(
+    (acc, [key, value]) => ({ ...acc, [key]: updateFn(value) }),
+    record
+  );
+};
+
 const update = (model: Model, msg: Msg): Model => {
   switch (msg.tag) {
     case "clickedCancel":
@@ -171,23 +192,42 @@ const update = (model: Model, msg: Msg): Model => {
         Right: (message) => {
           switch (message.tag) {
             case "hint":
-              const player: Player | undefined =
-                model.players[message.playerId as Player.Id];
-
-              if (player === undefined) {
-                return model;
-              }
-
-              const newPlayer = { ...player, hint: message.description };
-              const newPlayers = { ...model.players, [player.id]: newPlayer };
+              const newPlayers = withValues(
+                model.players,
+                [message.playerId] as Player.Id[],
+                (player) => {
+                  return { ...player, hint: message.description };
+                }
+              );
 
               return { ...model, players: newPlayers };
 
             case "declareContact":
+              const newPlayers2 = withValues(
+                model.players,
+                [message.players.fromId, message.players.toId] as Player.Id[],
+                (player): Player => {
+                  return { ...player, contactState: "declared" };
+                }
+              );
+
+              return { ...model, players: newPlayers2 };
+
             case "revealContact":
-              return model;
+              const contactState = message.success ? "succeeded" : "failed";
+
+              const newPlayers3 = withValues(
+                model.players,
+                [message.players.from.id, message.players.to.id] as Player.Id[],
+                (player): Player => {
+                  return { ...player, hint: "", contactState };
+                }
+              );
+
+              return { ...model, players: newPlayers3 };
 
             default:
+              console.error("UNKNOWN MESSAGE");
               return model;
           }
         },
