@@ -150,26 +150,37 @@ const parseWebSocketData = (data: unknown): Either<string, InboundMessage> => {
   }
 };
 
-const withValues = <K extends string | number | symbol, V>(
-  record: Record<K, V>,
-  keys: K[],
-  updateFn: (value: V) => V
-): Record<K, V> => {
-  const entries = keys.reduce<[K, V][]>((acc, key) => {
-    const value = record[key];
-    const entry: [K, V] = [key, value];
-    return value !== undefined ? [...acc, entry] : acc;
-  }, []);
+namespace Record {
+  export const updateWithData = <K extends string | number | symbol, V, T>(
+    record: Record<K, V>,
+    keysAndData: [K, T][],
+    updateFn: (value: V, data: T) => V
+  ): Record<K, V> => {
+    const entries = keysAndData.reduce<[K, [V, T]][]>((acc, [key, data]) => {
+      const value = record[key];
+      const entry: [K, [V, T]] = [key, [value, data]];
+      return value !== undefined ? [...acc, entry] : acc;
+    }, []);
 
-  if (entries.length !== keys.length) {
-    return record;
-  }
+    if (entries.length !== keysAndData.length) {
+      return record;
+    }
 
-  return entries.reduce(
-    (acc, [key, value]) => ({ ...acc, [key]: updateFn(value) }),
-    record
-  );
-};
+    return entries.reduce(
+      (acc, [key, [value, data]]) => ({ ...acc, [key]: updateFn(value, data) }),
+      record
+    );
+  };
+
+  export const update = <K extends string | number | symbol, V>(
+    record: Record<K, V>,
+    keys: K[],
+    updateFn: (value: V) => V
+  ): Record<K, V> => {
+    const keysAndData: [K, undefined][] = keys.map((key) => [key, undefined]);
+    return updateWithData(record, keysAndData, updateFn);
+  };
+}
 
 const update = (model: Model, msg: Msg): Model => {
   switch (msg.tag) {
@@ -192,7 +203,7 @@ const update = (model: Model, msg: Msg): Model => {
         Right: (message) => {
           switch (message.tag) {
             case "hint":
-              const newPlayers = withValues(
+              const newPlayers = Record.update(
                 model.players,
                 [message.playerId] as Player.Id[],
                 (player) => {
@@ -203,7 +214,7 @@ const update = (model: Model, msg: Msg): Model => {
               return { ...model, players: newPlayers };
 
             case "declareContact":
-              const newPlayers2 = withValues(
+              const newPlayers2 = Record.update(
                 model.players,
                 [message.players.fromId, message.players.toId] as Player.Id[],
                 (player): Player => {
@@ -216,11 +227,17 @@ const update = (model: Model, msg: Msg): Model => {
             case "revealContact":
               const contactState = message.success ? "succeeded" : "failed";
 
-              const newPlayers3 = withValues(
+              const newPlayers3 = Record.updateWithData(
                 model.players,
-                [message.players.from.id, message.players.to.id] as Player.Id[],
-                (player): Player => {
-                  return { ...player, hint: "", contactState };
+                [
+                  [
+                    message.players.from.id as Player.Id,
+                    message.players.from.word,
+                  ],
+                  [message.players.to.id as Player.Id, message.players.to.word],
+                ],
+                (player, word): Player => {
+                  return { ...player, hint: word, contactState };
                 }
               );
 
