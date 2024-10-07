@@ -15,6 +15,7 @@ import WordDisplay, {
 } from "contact/app/components/word-display";
 import Wordmaster from "contact/app/components/wordmaster";
 import {
+  type ContactState,
   type Player,
   type PlayerId,
   playerIdCodec,
@@ -26,9 +27,11 @@ type Action =
   | { tag: "hint" };
 
 type Model = {
+  contactState: ContactState | undefined;
   currentAction: Action;
   currentInput: string;
   players: Record<PlayerId, Player>;
+  playerId: PlayerId;
 };
 
 type Msg =
@@ -83,9 +86,11 @@ const MOCK_PLAYERS: Record<PlayerId, Player> = mockPlayerMap([
 ]);
 
 const MOCK_MODEL: Model = {
+  contactState: undefined,
   currentAction: { tag: "hint" },
   currentInput: "",
   players: MOCK_PLAYERS,
+  playerId: "00" as PlayerId,
 };
 
 // TODO - refactor duplicate codec parts
@@ -162,7 +167,7 @@ const update = (model: Model, msg: Msg): Model => {
 
         Right: (message) => {
           switch (message.tag) {
-            case "hint":
+            case "hint": {
               return {
                 ...model,
                 players: Record.update(
@@ -173,39 +178,70 @@ const update = (model: Model, msg: Msg): Model => {
                   }
                 ),
               };
+            }
 
-            case "declareContact":
+            case "declareContact": {
+              const [myContactState, otherPlayers]: [
+                ContactState | undefined,
+                PlayerId[]
+              ] =
+                message.players.toId === model.playerId
+                  ? ["declared", [message.players.fromId]]
+                  : [
+                      model.contactState,
+                      [message.players.fromId, message.players.toId],
+                    ];
+
               return {
                 ...model,
+                contactState: myContactState,
                 players: Record.update(
                   model.players,
-                  [message.players.fromId, message.players.toId],
+                  otherPlayers,
                   (player): Player => {
                     return { ...player, contactState: "declared" };
                   }
                 ),
               };
+            }
 
-            case "revealContact":
+            case "revealContact": {
               const contactState = message.success ? "succeeded" : "failed";
+
+              const [myContactState, otherPlayersAndData]: [
+                ContactState | undefined,
+                [PlayerId, string][]
+              ] =
+                message.players.to.id === model.playerId
+                  ? [
+                      contactState,
+                      [[message.players.from.id, message.players.from.word]],
+                    ]
+                  : [
+                      model.contactState,
+                      [
+                        [message.players.from.id, message.players.from.word],
+                        [message.players.to.id, message.players.to.word],
+                      ],
+                    ];
 
               return {
                 ...model,
+                contactState: myContactState,
                 players: Record.updateWithData(
                   model.players,
-                  [
-                    [message.players.from.id, message.players.from.word],
-                    [message.players.to.id, message.players.to.word],
-                  ],
+                  otherPlayersAndData,
                   (player, word): Player => {
                     return { ...player, hint: word, contactState };
                   }
                 ),
               };
+            }
 
-            default:
+            default: {
               console.error(`useReducer(): UNKNOWN MESSAGE '${msg.tag}'`);
               return model;
+            }
           }
         },
       });
@@ -269,6 +305,7 @@ export default function Home() {
                   : "press enter to share your hint with everyone"}
               </h3>
               <Input
+                contactState={model.contactState}
                 ref={inputRef}
                 onChange={(ev) =>
                   dispatch({ tag: "changedInput", value: ev.target.value })
