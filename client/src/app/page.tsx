@@ -24,7 +24,8 @@ import * as Record from "contact/app/util/record";
 
 type Action =
   | { tag: "contact"; player: { id: PlayerId; name: string } }
-  | { tag: "hint" };
+  | { tag: "hinting" }
+  | { tag: "thinking" };
 
 type Model = {
   currentAction: Action;
@@ -36,6 +37,8 @@ type Msg =
   | { tag: "changedInput"; value: string }
   | { tag: "clickedCancel" }
   | { tag: "clickedContact"; player: { id: PlayerId; name: string } }
+  | { tag: "sharedHint" }
+  | { tag: "stoppedSharingHint" }
   | { tag: "webSocketMessage"; data: unknown };
 
 type InboundMessage =
@@ -87,7 +90,7 @@ const MOCK_PLAYERS: Record<PlayerId, Player> = mockPlayerMap([
 const MOCK_MY_PLAYER_ID = "0" as PlayerId;
 
 const MOCK_MODEL: Model = {
-  currentAction: { tag: "hint" },
+  currentAction: { tag: "thinking" },
   currentInput: "",
   players: MOCK_PLAYERS,
 };
@@ -149,12 +152,25 @@ const update = (model: Model, msg: Msg): Model => {
       return { ...model, currentInput: msg.value };
 
     case "clickedCancel":
-      return { ...model, currentAction: { tag: "hint" }, currentInput: "" };
+      return { ...model, currentAction: { tag: "thinking" }, currentInput: "" };
 
     case "clickedContact":
       return {
         ...model,
         currentAction: { tag: "contact", player: msg.player },
+      };
+
+    case "sharedHint":
+      return {
+        ...model,
+        currentAction: { tag: "hinting" },
+      };
+
+    case "stoppedSharingHint":
+      return {
+        ...model,
+        currentAction: { tag: "thinking" },
+        currentInput: "",
       };
 
     case "webSocketMessage":
@@ -284,25 +300,50 @@ export default function Home() {
                   ? "words, words, words..."
                   : model.currentAction.tag === "contact"
                   ? `press enter to contact with ${model.currentAction.player.name}`
+                  : model.currentAction.tag === "hinting"
+                  ? "press escape to stop sharing your hint"
                   : "press enter to share your hint with everyone"}
               </h3>
               <Input
-                contactState={myPlayer.contactState}
+                className={`${
+                  model.currentAction.tag === "hinting"
+                    ? "font-bold caret-transparent"
+                    : "font-normal caret-inherit"
+                } ${
+                  myPlayer.contactState === undefined
+                    ? "border-zinc-300"
+                    : myPlayer.contactState.tag === "declared"
+                    ? "border-blue-800"
+                    : myPlayer.contactState.tag === "failed"
+                    ? "border-red-800"
+                    : "border-green-800"
+                }`}
                 ref={inputRef}
-                onChange={(ev) =>
-                  dispatch({ tag: "changedInput", value: ev.target.value })
-                }
+                onChange={(ev) => {
+                  if (model.currentAction.tag !== "hinting") {
+                    dispatch({ tag: "changedInput", value: ev.target.value });
+                  }
+                }}
                 onEnter={() => {
-                  const message: OutboundMessage =
-                    model.currentAction.tag === "contact"
-                      ? {
-                          tag: "contact",
-                          playerId: model.currentAction.player.id,
-                          word: model.currentInput,
-                        }
-                      : { tag: "hint", description: model.currentInput };
+                  if (model.currentAction.tag === "contact") {
+                    sendServer({
+                      tag: "contact",
+                      playerId: model.currentAction.player.id,
+                      word: model.currentInput,
+                    });
+                  } else if (model.currentAction.tag === "thinking") {
+                    dispatch({ tag: "sharedHint" });
 
-                  sendServer(message);
+                    sendServer({
+                      tag: "hint",
+                      description: model.currentInput,
+                    });
+                  }
+                }}
+                onEscape={() => {
+                  if (model.currentAction.tag === "hinting") {
+                    dispatch({ tag: "stoppedSharingHint" });
+                  }
                 }}
                 placeholder={
                   model.currentAction.tag === "contact"

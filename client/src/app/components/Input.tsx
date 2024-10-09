@@ -1,44 +1,37 @@
 import {
   type ChangeEventHandler,
   type KeyboardEventHandler,
+  type InputHTMLAttributes,
   forwardRef,
 } from "react";
 
 import type { ContactState } from "contact/app/data/player";
 
-export type Props = {
-  contactState: ContactState | undefined;
+export interface Props extends InputHTMLAttributes<HTMLInputElement> {
   onChange: ChangeEventHandler<HTMLInputElement>;
   onEnter: KeyboardEventHandler<HTMLInputElement>;
-  placeholder: string;
-  value: string;
-};
+  onEscape: KeyboardEventHandler<HTMLInputElement>;
+}
 
 const Input = forwardRef<HTMLInputElement, Props>(
-  ({ contactState, onChange, onEnter, placeholder, value }, ref) => {
+  ({ onChange, onEnter, onEscape, ...props }, ref) => {
     const onKeyDown: KeyboardEventHandler<HTMLInputElement> = (ev) => {
       if (ev.key === "Enter") {
         onEnter(ev);
+      } else if (ev.key === "Escape") {
+        onEscape(ev);
       }
     };
 
-    const borderColor =
-      contactState === "declared"
-        ? "border-blue-800"
-        : contactState === "failed"
-        ? "border-red-800"
-        : contactState === "succeeded"
-        ? "border-green-800"
-        : "border-zinc-300";
+    const { className, ...restProps } = props;
 
     return (
       <input
-        className={`p-1 min-w-96 border-2 rounded-lg focus:outline-zinc-800 ${borderColor}`}
+        {...restProps}
+        className={`p-1 min-w-96 border-2 rounded-lg focus:outline-zinc-800 ${className}`}
         onChange={onChange}
         onKeyDown={onKeyDown}
-        placeholder={placeholder}
         ref={ref}
-        value={value}
       ></input>
     );
   }
