@@ -15,7 +15,6 @@ import WordDisplay, {
 } from "contact/app/components/word-display";
 import Wordmaster from "contact/app/components/wordmaster";
 import {
-  type HintState,
   type Player,
   type PlayerId,
   playerIdCodec,
@@ -282,6 +281,12 @@ export default function Home() {
 
   const { [MOCK_MY_PLAYER_ID]: myPlayer, ...players } = model.players;
 
+  const contactingPlayers = Object.values(players)
+    .filter(({ contactState }) => contactState !== undefined)
+    .slice(0, 2);
+
+  const isAnyoneContacting = contactingPlayers.length === 2;
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
@@ -311,7 +316,9 @@ export default function Home() {
             </div>
             <div className="flex flex-col gap-1">
               <h3 className="text-zinc-400 text-sm">
-                {model.currentInput === ""
+                {isAnyoneContacting
+                  ? `${contactingPlayers[0].name} and ${contactingPlayers[1].name} are about to contact`
+                  : model.currentInput === ""
                   ? "words, words, words..."
                   : model.currentAction.tag === "contact"
                   ? `press enter to contact with ${model.currentAction.player.name}`
@@ -321,7 +328,7 @@ export default function Home() {
               </h3>
               <Input
                 className={`${
-                  model.currentAction.tag === "hinting"
+                  model.currentAction.tag === "hinting" && !isAnyoneContacting
                     ? "font-bold caret-transparent border-zinc-800"
                     : "font-normal caret-inherit border-inherit"
                 } ${
@@ -332,7 +339,7 @@ export default function Home() {
                     : myPlayer.contactState.tag === "failed"
                     ? "border-red-800"
                     : "border-green-800"
-                }`}
+                } ${isAnyoneContacting ? "cursor-not-allowed" : "cursor-auto"}`}
                 ref={inputRef}
                 onChange={(ev) => {
                   if (model.currentAction.tag !== "hinting") {
@@ -356,11 +363,14 @@ export default function Home() {
                   }
                 }}
                 placeholder={
-                  model.currentAction.tag === "contact"
+                  isAnyoneContacting
+                    ? "...suspense..."
+                    : model.currentAction.tag === "contact"
                     ? "type your guess here..."
                     : "type your hint here..."
                 }
-                value={model.currentInput}
+                value={isAnyoneContacting ? "" : model.currentInput}
+                disabled={isAnyoneContacting}
               />
             </div>
           </div>
