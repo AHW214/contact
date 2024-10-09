@@ -27,11 +27,9 @@ type Action =
   | { tag: "hint" };
 
 type Model = {
-  contactState: ContactState | undefined;
   currentAction: Action;
   currentInput: string;
   players: Record<PlayerId, Player>;
-  playerId: PlayerId;
 };
 
 type Msg =
@@ -80,17 +78,18 @@ const MOCK_TARGET_WORD: TargetWord = { status: "guessing", word: "evange" };
 const MOCK_WORDMASTER: string = "Shinji Ikari";
 
 const MOCK_PLAYERS: Record<PlayerId, Player> = mockPlayerMap([
+  "Sei",
   "Bob",
   "Alice",
   "Gandalf",
 ]);
 
+const MOCK_MY_PLAYER_ID = "0" as PlayerId;
+
 const MOCK_MODEL: Model = {
-  contactState: undefined,
   currentAction: { tag: "hint" },
   currentInput: "",
   players: MOCK_PLAYERS,
-  playerId: "00" as PlayerId,
 };
 
 // TODO - refactor duplicate codec parts
@@ -181,23 +180,11 @@ const update = (model: Model, msg: Msg): Model => {
             }
 
             case "declareContact": {
-              const [myContactState, otherPlayers]: [
-                ContactState | undefined,
-                PlayerId[]
-              ] =
-                message.players.toId === model.playerId
-                  ? ["declared", [message.players.fromId]]
-                  : [
-                      model.contactState,
-                      [message.players.fromId, message.players.toId],
-                    ];
-
               return {
                 ...model,
-                contactState: myContactState,
                 players: Record.update(
                   model.players,
-                  otherPlayers,
+                  [message.players.fromId, message.players.toId],
                   (player): Player => {
                     return { ...player, contactState: "declared" };
                   }
@@ -208,31 +195,20 @@ const update = (model: Model, msg: Msg): Model => {
             case "revealContact": {
               const contactState = message.success ? "succeeded" : "failed";
 
-              const [myContactState, otherPlayersAndData]: [
-                ContactState | undefined,
-                [PlayerId, string][]
-              ] =
-                message.players.to.id === model.playerId
-                  ? [
-                      contactState,
-                      [[message.players.from.id, message.players.from.word]],
-                    ]
-                  : [
-                      model.contactState,
-                      [
-                        [message.players.from.id, message.players.from.word],
-                        [message.players.to.id, message.players.to.word],
-                      ],
-                    ];
-
               return {
                 ...model,
-                contactState: myContactState,
                 players: Record.updateWithData(
                   model.players,
-                  otherPlayersAndData,
+                  [
+                    [message.players.from.id, message.players.from.word],
+                    [message.players.to.id, message.players.to.word],
+                  ],
                   (player, word): Player => {
-                    return { ...player, hint: word, contactState };
+                    return {
+                      ...player,
+                      hint: word,
+                      contactState,
+                    };
                   }
                 ),
               };
@@ -271,17 +247,21 @@ export default function Home() {
     }
   }, [lastMessage]);
 
+  const { [MOCK_MY_PLAYER_ID]: myPlayer, ...players } = model.players;
+
   return (
     <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
       <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
         {readyState !== ReadyState.OPEN ? (
           <div>websocket state: {showWebSocketState(readyState)}</div>
+        ) : myPlayer === undefined ? (
+          <div>... who am i ...</div>
         ) : (
           <div className="flex flex-col gap-8 items-center">
             <WordDisplay target={MOCK_TARGET_WORD} />
             <Wordmaster id="0" name={MOCK_WORDMASTER} />
             <div className="flex gap-2">
-              {Object.values(model.players).map((player) => (
+              {Object.values(players).map((player) => (
                 <PlayerView
                   key={player.id}
                   inputRef={inputRef}
@@ -305,7 +285,7 @@ export default function Home() {
                   : "press enter to share your hint with everyone"}
               </h3>
               <Input
-                contactState={model.contactState}
+                contactState={myPlayer.contactState}
                 ref={inputRef}
                 onChange={(ev) =>
                   dispatch({ tag: "changedInput", value: ev.target.value })
