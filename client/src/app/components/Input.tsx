@@ -5,21 +5,16 @@ import {
   forwardRef,
 } from "react";
 
-import type { ContactState } from "contact/app/data/player";
-
 export interface Props extends InputHTMLAttributes<HTMLInputElement> {
   onChange: ChangeEventHandler<HTMLInputElement>;
   onEnter: KeyboardEventHandler<HTMLInputElement>;
-  onEscape: KeyboardEventHandler<HTMLInputElement>;
 }
 
 const Input = forwardRef<HTMLInputElement, Props>(
-  ({ onChange, onEnter, onEscape, ...props }, ref) => {
+  ({ onChange, onEnter, ...props }, ref) => {
     const onKeyDown: KeyboardEventHandler<HTMLInputElement> = (ev) => {
       if (ev.key === "Enter") {
         onEnter(ev);
-      } else if (ev.key === "Escape") {
-        onEscape(ev);
       }
     };
 

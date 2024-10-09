@@ -37,8 +37,8 @@ type Msg =
   | { tag: "changedInput"; value: string }
   | { tag: "clickedCancel" }
   | { tag: "clickedContact"; player: { id: PlayerId; name: string } }
+  | { tag: "clickedEscape" }
   | { tag: "sharedHint" }
-  | { tag: "stoppedSharingHint" }
   | { tag: "webSocketMessage"; data: unknown };
 
 type InboundMessage =
@@ -160,17 +160,19 @@ const update = (model: Model, msg: Msg): Model => {
         currentAction: { tag: "contact", player: msg.player },
       };
 
+    case "clickedEscape":
+      return model.currentAction.tag === "hinting"
+        ? {
+            ...model,
+            currentAction: { tag: "thinking" },
+            currentInput: "",
+          }
+        : model;
+
     case "sharedHint":
       return {
         ...model,
         currentAction: { tag: "hinting" },
-      };
-
-    case "stoppedSharingHint":
-      return {
-        ...model,
-        currentAction: { tag: "thinking" },
-        currentInput: "",
       };
 
     case "webSocketMessage":
@@ -252,6 +254,19 @@ export default function Home() {
 
   const WEB_SOCKET_URL = "ws://localhost:1234";
 
+  useEffect(() => {
+    const onKeyup = (ev: KeyboardEvent) => {
+      console.log("hi", ev.key, model.currentAction);
+      if (ev.key === "Escape") {
+        dispatch({ tag: "clickedEscape" });
+      }
+    };
+
+    document.addEventListener("keyup", onKeyup);
+
+    return () => document.removeEventListener("keyup", onKeyup);
+  }, []);
+
   // TODO: check readystate and display loading screen if not yet connected etc
   const { sendMessage, lastMessage, readyState } = useWebSocket(WEB_SOCKET_URL);
 
@@ -307,8 +322,8 @@ export default function Home() {
               <Input
                 className={`${
                   model.currentAction.tag === "hinting"
-                    ? "font-bold caret-transparent"
-                    : "font-normal caret-inherit"
+                    ? "font-bold caret-transparent border-zinc-800"
+                    : "font-normal caret-inherit border-inherit"
                 } ${
                   myPlayer.contactState === undefined
                     ? "border-zinc-300"
@@ -338,11 +353,6 @@ export default function Home() {
                       tag: "hint",
                       description: model.currentInput,
                     });
-                  }
-                }}
-                onEscape={() => {
-                  if (model.currentAction.tag === "hinting") {
-                    dispatch({ tag: "stoppedSharingHint" });
                   }
                 }}
                 placeholder={
