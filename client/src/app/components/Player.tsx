@@ -6,6 +6,7 @@ import type { ContactState, HintState } from "contact/app/data/player";
 
 export type Props = {
   contactState: ContactState | undefined;
+  countdownMillis: number | undefined;
   hintState: HintState;
   id: string;
   inputRef: RefObject<HTMLInputElement>;
@@ -17,6 +18,7 @@ export type Props = {
 
 export default function Player({
   contactState,
+  countdownMillis,
   hintState,
   id,
   inputRef,
@@ -42,7 +44,8 @@ export default function Player({
               ? "border-zinc-800"
               : "border-zinc-300",
           cursor: "cursor-pointer",
-          visibility: "group-hover:visible",
+          hoverVisibility: "group-hover:visible",
+          visibility: "invisible",
         }
       : {
           borderColor:
@@ -54,10 +57,22 @@ export default function Player({
               ? "border-blue-800"
               : "border-zinc-300",
           cursor: "auto",
-          visibility: "group-hover:invisible",
+          hoverVisibility:
+            contactState?.tag === "declared" && countdownMillis !== undefined
+              ? "group-hover:visible"
+              : "group-hover:invisible",
+          visibility:
+            contactState?.tag === "declared" && countdownMillis !== undefined
+              ? "visible"
+              : "invisible",
         };
 
-  const coverText = isSelected ? "cancel" : "contact";
+  const coverText =
+    contactState?.tag === "declared" && countdownMillis !== undefined
+      ? `${countdownMillis / 1000}`
+      : isSelected
+      ? "cancel"
+      : "contact";
 
   const onClick: MouseEventHandler<HTMLDivElement> = (ev) => {
     if (isSelected) {
@@ -77,7 +92,7 @@ export default function Player({
   return (
     <div key={id} className="relative group">
       <div
-        className={`absolute top-0 left-0 w-full h-full flex items-center justify-center rounded-lg bg-zinc-800 invisible ${classes.visibility}`}
+        className={`absolute top-0 left-0 w-full h-full flex items-center justify-center rounded-lg bg-zinc-800 ${classes.visibility} ${classes.hoverVisibility}`}
         onClick={onClick}
       >
         <h3 className="text-zinc-100 text-center text-3xl uppercase">

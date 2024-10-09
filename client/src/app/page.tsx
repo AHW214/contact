@@ -4,7 +4,13 @@
 import { type Either, Left, Right } from "purify-ts";
 import { Codec } from "purify-ts/Codec";
 import * as C from "purify-ts/Codec";
-import { type Ref, useEffect, useReducer, useRef, useState } from "react";
+import {
+  type MutableRefObject,
+  type Ref,
+  useEffect,
+  useReducer,
+  useRef,
+} from "react";
 import useWebSocket, { ReadyState } from "react-use-websocket";
 
 import Input from "contact/app/components/input";
@@ -27,6 +33,7 @@ type Action =
   | { tag: "thinking" };
 
 type Model = {
+  countdown: number | undefined;
   currentAction: Action;
   currentInput: string;
   players: Record<PlayerId, Player>;
@@ -38,6 +45,7 @@ type Msg =
   | { tag: "clickedContact"; player: { id: PlayerId; name: string } }
   | { tag: "clickedEscape" }
   | { tag: "sharedHint" }
+  | { tag: "tickCountdown"; millis: number }
   | { tag: "webSocketMessage"; data: unknown };
 
 type InboundMessage =
@@ -89,6 +97,7 @@ const MOCK_PLAYERS: Record<PlayerId, Player> = mockPlayerMap([
 const MOCK_MY_PLAYER_ID = "0" as PlayerId;
 
 const MOCK_MODEL: Model = {
+  countdown: undefined,
   currentAction: { tag: "thinking" },
   currentInput: "",
   players: MOCK_PLAYERS,
@@ -174,6 +183,18 @@ const update = (model: Model, msg: Msg): Model => {
         currentAction: { tag: "hinting" },
       };
 
+    case "tickCountdown":
+      if (model.countdown !== undefined) {
+        const newCountdown = model.countdown - msg.millis;
+
+        return {
+          ...model,
+          countdown: newCountdown > 0 ? newCountdown : undefined,
+        };
+      }
+
+      return model;
+
     case "webSocketMessage":
       return parseWebSocketData(msg.data).caseOf({
         Left: (err) => {
@@ -202,11 +223,15 @@ const update = (model: Model, msg: Msg): Model => {
             case "declareContact": {
               return {
                 ...model,
+                countdown: 5000,
                 players: Record.update(
                   model.players,
                   [message.players.fromId, message.players.toId],
                   (player): Player => {
-                    return { ...player, contactState: { tag: "declared" } };
+                    return {
+                      ...player,
+                      contactState: { tag: "declared" },
+                    };
                   }
                 ),
               };
@@ -248,6 +273,7 @@ const update = (model: Model, msg: Msg): Model => {
 
 export default function Home() {
   const inputRef: Ref<HTMLInputElement> = useRef(null);
+  const intervalRef: MutableRefObject<number | undefined> = useRef(undefined);
 
   const [model, dispatch] = useReducer(update, MOCK_MODEL);
 
@@ -255,7 +281,6 @@ export default function Home() {
 
   useEffect(() => {
     const onKeyup = (ev: KeyboardEvent) => {
-      console.log("hi", ev.key, model.currentAction);
       if (ev.key === "Escape") {
         dispatch({ tag: "clickedEscape" });
       }
@@ -265,6 +290,29 @@ export default function Home() {
 
     return () => document.removeEventListener("keyup", onKeyup);
   }, []);
+
+  useEffect(() => {
+    const cleanup = () => {
+      if (intervalRef.current !== null && intervalRef.current !== undefined) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = undefined;
+      }
+    };
+
+    if (model.countdown !== undefined) {
+      if (intervalRef.current !== undefined) {
+        clearInterval(intervalRef.current);
+      }
+
+      intervalRef.current = window.setInterval(() => {
+        dispatch({ tag: "tickCountdown", millis: 1000 });
+      }, 1000);
+    } else {
+      cleanup();
+    }
+
+    return cleanup;
+  }, [model.countdown === undefined]);
 
   // TODO: check readystate and display loading screen if not yet connected etc
   const { sendMessage, lastMessage, readyState } = useWebSocket(WEB_SOCKET_URL);
@@ -303,6 +351,7 @@ export default function Home() {
                 <PlayerView
                   key={player.id}
                   inputRef={inputRef}
+                  countdownMillis={model.countdown}
                   onClickCancel={() => dispatch({ tag: "clickedCancel" })}
                   onClickContact={() =>
                     dispatch({
