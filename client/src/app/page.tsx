@@ -15,7 +15,7 @@ import WordDisplay, {
 } from "contact/app/components/word-display";
 import Wordmaster from "contact/app/components/wordmaster";
 import {
-  type ContactState,
+  type HintState,
   type Player,
   type PlayerId,
   playerIdCodec,
@@ -62,7 +62,7 @@ type MockPlayerParams = {
 
 const mockPlayer = ({ id, name }: MockPlayerParams): Player => ({
   contactState: undefined,
-  hint: undefined,
+  hintState: { tag: "thinking" },
   id: id as PlayerId,
   isTyping: false,
   name,
@@ -173,7 +173,10 @@ const update = (model: Model, msg: Msg): Model => {
                   model.players,
                   [message.playerId],
                   (player) => {
-                    return { ...player, hint: message.description };
+                    return {
+                      ...player,
+                      hintState: { tag: "sharing", word: message.description },
+                    };
                   }
                 ),
               };
@@ -186,14 +189,14 @@ const update = (model: Model, msg: Msg): Model => {
                   model.players,
                   [message.players.fromId, message.players.toId],
                   (player): Player => {
-                    return { ...player, contactState: "declared" };
+                    return { ...player, contactState: { tag: "declared" } };
                   }
                 ),
               };
             }
 
             case "revealContact": {
-              const contactState = message.success ? "succeeded" : "failed";
+              const contactStatus = message.success ? "succeeded" : "failed";
 
               return {
                 ...model,
@@ -206,8 +209,7 @@ const update = (model: Model, msg: Msg): Model => {
                   (player, word): Player => {
                     return {
                       ...player,
-                      hint: word,
-                      contactState,
+                      contactState: { tag: contactStatus, word },
                     };
                   }
                 ),

@@ -2,11 +2,11 @@
 
 import { type MouseEventHandler, type RefObject, useState } from "react";
 
-import type { ContactState } from "contact/app/data/player";
+import type { ContactState, HintState } from "contact/app/data/player";
 
 export type Props = {
   contactState: ContactState | undefined;
-  hint: string | undefined;
+  hintState: HintState;
   id: string;
   inputRef: RefObject<HTMLInputElement>;
   isTyping: boolean;
@@ -17,7 +17,7 @@ export type Props = {
 
 export default function Player({
   contactState,
-  hint,
+  hintState,
   id,
   inputRef,
   isTyping,
@@ -27,15 +27,16 @@ export default function Player({
 }: Props) {
   const [isSelected, setIsSelected] = useState<boolean>(false);
 
+  // TODO - clean up
   const classes =
-    hint !== undefined && hint !== ""
+    hintState.tag === "sharing" && hintState.word !== ""
       ? {
           borderColor:
-            contactState === "failed"
+            contactState?.tag === "failed"
               ? "border-red-800"
-              : contactState === "succeeded"
+              : contactState?.tag === "succeeded"
               ? "border-green-800"
-              : contactState === "declared"
+              : contactState?.tag === "declared"
               ? "border-blue-800"
               : isSelected
               ? "border-zinc-800"
@@ -45,11 +46,11 @@ export default function Player({
         }
       : {
           borderColor:
-            contactState === "failed"
+            contactState?.tag === "failed"
               ? "border-red-800"
-              : contactState === "succeeded"
+              : contactState?.tag === "succeeded"
               ? "border-green-800"
-              : contactState === "declared"
+              : contactState?.tag === "declared"
               ? "border-blue-800"
               : "border-zinc-300",
           cursor: "auto",
@@ -91,8 +92,8 @@ export default function Player({
         >
           <h3>{name}</h3>
         </div>
-        {hint !== undefined && hint !== "" ? (
-          <p className="ml-2">{hint}</p>
+        {hintState.tag === "sharing" && hintState.word !== "" ? (
+          <p className="ml-2">{hintState.word}</p>
         ) : isTyping ? (
           <p className="ml-2 tracking-widest">...</p>
         ) : undefined}
