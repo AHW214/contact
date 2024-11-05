@@ -1,2 +1,6 @@
+# Haskell Stack
 .stack-work/
 *~
+
+# HLS
+hie.yaml
