@@ -1,6 +1,6 @@
 module Main (main) where
 
-import Server
+import Server (handleConnection, newServer)
 
 main :: IO ()
-main = someFunc
+main = undefined

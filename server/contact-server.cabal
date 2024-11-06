@@ -34,9 +34,11 @@ library
       src
   default-extensions:
       NamedFieldPuns
+      OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      base >=4.7 && <5
+      async
+    , base >=4.7 && <5
     , containers
     , stm
     , text
@@ -53,9 +55,11 @@ executable contact-server-exe
       app
   default-extensions:
       NamedFieldPuns
+      OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      async
+    , base >=4.7 && <5
     , contact-server
     , containers
     , stm
@@ -74,9 +78,11 @@ test-suite contact-server-test
       test
   default-extensions:
       NamedFieldPuns
+      OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      async
+    , base >=4.7 && <5
     , contact-server
     , containers
     , stm

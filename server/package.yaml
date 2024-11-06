@@ -20,6 +20,7 @@ extra-source-files:
 description: Please see the README on GitHub at <https://github.com/githubuser/contact-server#readme>
 
 dependencies:
+  - async
   - base >= 4.7 && < 5
   - containers
   - stm
@@ -28,6 +29,7 @@ dependencies:
 
 default-extensions:
   - NamedFieldPuns
+  - OverloadedStrings
 
 ghc-options:
   - -Wall
