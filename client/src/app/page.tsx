@@ -62,8 +62,8 @@ type InboundMessage =
     };
 
 type OutboundMessage =
-  | { tag: "contact"; playerId: PlayerId; word: string }
-  | { tag: "hint"; description: string };
+  | { tag: "contact"; data: { playerId: PlayerId; word: string } }
+  | { tag: "hint"; data: { description: string } };
 
 type MockPlayerParams = {
   id: string;
@@ -404,15 +404,19 @@ export default function Home() {
                   if (model.currentAction.tag === "contact") {
                     sendServer({
                       tag: "contact",
-                      playerId: model.currentAction.player.id,
-                      word: model.currentInput,
+                      data: {
+                        playerId: model.currentAction.player.id,
+                        word: model.currentInput,
+                      },
                     });
                   } else if (model.currentAction.tag === "thinking") {
                     dispatch({ tag: "sharedHint" });
 
                     sendServer({
                       tag: "hint",
-                      description: model.currentInput,
+                      data: {
+                        description: model.currentInput,
+                      },
                     });
                   }
                 }}

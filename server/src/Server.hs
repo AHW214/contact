@@ -16,7 +16,8 @@ import Control.Exception (finally)
 import Control.Monad (forever, join, when)
 import Data.Aeson
   ( FromJSON (parseJSON),
-    Options (constructorTagModifier),
+    Options (constructorTagModifier, sumEncoding),
+    SumEncoding (contentsFieldName),
   )
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Casing (camelCase)
@@ -44,29 +45,36 @@ data Message
   | Inbound ClientMessage
 
 data ClientMessage
-  = ContactMessage Contact
-  | HintMessage Hint
+  = Contact ContactMessage
+  | Hint HintMessage
   deriving (Generic, Show)
 
 instance FromJSON ClientMessage where
   parseJSON =
     Aeson.genericParseJSON $
-      Aeson.defaultOptions {constructorTagModifier = camelCase}
+      Aeson.defaultOptions
+        { constructorTagModifier = camelCase,
+          sumEncoding = sumEncodingOptions
+        }
+    where
+      sumEncodingOptions :: SumEncoding
+      sumEncodingOptions =
+        Aeson.defaultTaggedObject {contentsFieldName = "data"}
 
-data Contact = Contact
+data ContactMessage = ContactMessage
   { playerId :: Text,
     word :: Text
   }
   deriving (Generic, Show)
 
-instance FromJSON Contact
+instance FromJSON ContactMessage
 
-newtype Hint = Hint
+newtype HintMessage = HintMessage
   { description :: Text
   }
   deriving (Generic, Show)
 
-instance FromJSON Hint
+instance FromJSON HintMessage
 
 handleConnection :: Server -> WS.Connection -> IO ()
 handleConnection server@Server {serverClients} conn =
