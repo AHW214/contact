@@ -33,12 +33,16 @@ library
   hs-source-dirs:
       src
   default-extensions:
+      DeriveGeneric
       NamedFieldPuns
       OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
-      async
+      aeson
+    , aeson-casing
+    , async
     , base >=4.7 && <5
+    , bytestring
     , containers
     , stm
     , text
@@ -54,12 +58,16 @@ executable contact-server
   hs-source-dirs:
       app
   default-extensions:
+      DeriveGeneric
       NamedFieldPuns
       OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      async
+      aeson
+    , aeson-casing
+    , async
     , base >=4.7 && <5
+    , bytestring
     , contact-server
     , containers
     , stm
@@ -77,12 +85,16 @@ test-suite contact-server-test
   hs-source-dirs:
       test
   default-extensions:
+      DeriveGeneric
       NamedFieldPuns
       OverloadedStrings
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      async
+      aeson
+    , aeson-casing
+    , async
     , base >=4.7 && <5
+    , bytestring
     , contact-server
     , containers
     , stm

@@ -20,14 +20,18 @@ extra-source-files:
 description: Please see the README on GitHub at <https://github.com/githubuser/contact-server#readme>
 
 dependencies:
+  - aeson
+  - aeson-casing
   - async
   - base >= 4.7 && < 5
+  - bytestring
   - containers
   - stm
   - text
   - websockets
 
 default-extensions:
+  - DeriveGeneric
   - NamedFieldPuns
   - OverloadedStrings
 

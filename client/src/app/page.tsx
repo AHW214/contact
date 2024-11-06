@@ -315,10 +315,15 @@ export default function Home() {
   }, [model.countdown === undefined]);
 
   // TODO: check readystate and display loading screen if not yet connected etc
-  const { sendMessage, lastMessage, readyState } = useWebSocket(WEB_SOCKET_URL);
+  const { sendJsonMessage, sendMessage, lastMessage, readyState } =
+    useWebSocket(WEB_SOCKET_URL, {
+      onOpen: () => {
+        sendMessage("sei");
+      },
+    });
 
   const sendServer = (message: OutboundMessage): void =>
-    sendMessage(JSON.stringify(message));
+    sendJsonMessage(message);
 
   useEffect(() => {
     if (lastMessage !== null) {

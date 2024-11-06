@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Server
   ( Client (..),
     Message (..),
@@ -12,10 +14,18 @@ import Control.Concurrent.STM (STM, TBQueue, TVar)
 import qualified Control.Concurrent.STM as STM
 import Control.Exception (finally)
 import Control.Monad (forever, join, when)
+import Data.Aeson
+  ( FromJSON (parseJSON),
+    Options (constructorTagModifier),
+  )
+import qualified Data.Aeson as Aeson
+import Data.Aeson.Casing (camelCase)
+import Data.ByteString (ByteString)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import GHC.Generics (Generic)
 import qualified Network.WebSockets as WS
 import Numeric.Natural (Natural)
 
@@ -31,7 +41,32 @@ data Client = Client
 
 data Message
   = Hi
-  | Inbound Text
+  | Inbound ClientMessage
+
+data ClientMessage
+  = ContactMessage Contact
+  | HintMessage Hint
+  deriving (Generic, Show)
+
+instance FromJSON ClientMessage where
+  parseJSON =
+    Aeson.genericParseJSON $
+      Aeson.defaultOptions {constructorTagModifier = camelCase}
+
+data Contact = Contact
+  { playerId :: Text,
+    word :: Text
+  }
+  deriving (Generic, Show)
+
+instance FromJSON Contact
+
+newtype Hint = Hint
+  { description :: Text
+  }
+  deriving (Generic, Show)
+
+instance FromJSON Hint
 
 handleConnection :: Server -> WS.Connection -> IO ()
 handleConnection server@Server {serverClients} conn =
@@ -71,7 +106,11 @@ handleClient client@Client {clientSendQueue} = do
     receive :: IO ()
     receive = forever $ do
       msg <- receiveMessage client
-      STM.atomically $ sendMessage client $ Inbound msg
+      case Aeson.eitherDecodeStrict msg of
+        Left err ->
+          putStrLn $ "could not decode client message: " <> err
+        Right clientMessage ->
+          STM.atomically $ sendMessage client $ Inbound clientMessage
 
     serve :: IO ()
     serve = join $ STM.atomically $ do
@@ -81,26 +120,14 @@ handleClient client@Client {clientSendQueue} = do
         when continue serve
 
 handleMessage :: Client -> Message -> IO Bool
-handleMessage Client {clientConnection, clientName} message =
+handleMessage Client {clientName} message =
   case message of
-    Hi ->
-      tellClient $ "hi hi " <> clientName <> "! welcome to the server :^)"
-    Inbound "byebye" -> do
-      sayBye
-    Inbound msg ->
-      tellClient $ "you said: \"" <> msg <> "\""
-  where
-    tellClient :: Text -> IO Bool
-    tellClient msg = do
-      WS.sendTextData clientConnection msg
+    Hi -> do
+      putStrLn $ "hi hi " <> Text.unpack clientName <> "! welcome to the server :^)"
       pure True
-
-    sayBye :: IO Bool
-    sayBye = do
-      let farewell :: Text
-          farewell = "we'll miss you!"
-      WS.sendTextData clientConnection farewell
-      pure False
+    Inbound msg -> do
+      putStrLn $ "received message: " <> show msg
+      pure True
 
 removeClient :: Server -> Text -> IO ()
 removeClient Server {serverClients} clientName = STM.atomically $ do
@@ -124,9 +151,9 @@ newClient conn name = do
         clientSendQueue = sendQueue
       }
 
-receiveMessage :: Client -> IO Text
+receiveMessage :: Client -> IO ByteString
 receiveMessage Client {clientConnection} =
-  Text.strip <$> WS.receiveData clientConnection
+  WS.receiveData clientConnection
 
 sendMessage :: Client -> Message -> STM ()
 sendMessage Client {clientSendQueue} =
