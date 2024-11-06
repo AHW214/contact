@@ -15,6 +15,7 @@ import Control.Monad (forever, join, when)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified Network.WebSockets as WS
 import Numeric.Natural (Natural)
 
@@ -35,7 +36,7 @@ data Message
 handleConnection :: Server -> WS.Connection -> IO ()
 handleConnection server@Server {serverClients} conn =
   WS.withPingThread conn pingMillis onPing $ do
-    name <- WS.receiveData conn
+    name <- Text.strip <$> WS.receiveData conn
 
     maybeClient <-
       STM.atomically $ do
@@ -62,13 +63,14 @@ handleConnection server@Server {serverClients} conn =
     pingMillis = 30
 
 handleClient :: Client -> IO ()
-handleClient client@Client {clientConnection, clientSendQueue} = do
+handleClient client@Client {clientSendQueue} = do
+  STM.atomically $ sendMessage client Hi
   _ <- Async.race receive serve
   pure ()
   where
     receive :: IO ()
     receive = forever $ do
-      msg <- WS.receiveData clientConnection
+      msg <- receiveMessage client
       STM.atomically $ sendMessage client $ Inbound msg
 
     serve :: IO ()
@@ -79,19 +81,26 @@ handleClient client@Client {clientConnection, clientSendQueue} = do
         when continue serve
 
 handleMessage :: Client -> Message -> IO Bool
-handleMessage Client {clientConnection} message =
+handleMessage Client {clientConnection, clientName} message =
   case message of
     Hi ->
-      tellClient "hiiii~"
-    Inbound "byebye" ->
-      pure False
+      tellClient $ "hi hi " <> clientName <> "! welcome to the server :^)"
+    Inbound "byebye" -> do
+      sayBye
     Inbound msg ->
       tellClient $ "you said: \"" <> msg <> "\""
   where
     tellClient :: Text -> IO Bool
     tellClient msg = do
-      _ <- WS.sendTextData clientConnection msg
+      WS.sendTextData clientConnection msg
       pure True
+
+    sayBye :: IO Bool
+    sayBye = do
+      let farewell :: Text
+          farewell = "we'll miss you!"
+      WS.sendTextData clientConnection farewell
+      pure False
 
 removeClient :: Server -> Text -> IO ()
 removeClient Server {serverClients} clientName = STM.atomically $ do
@@ -114,6 +123,10 @@ newClient conn name = do
         clientName = name,
         clientSendQueue = sendQueue
       }
+
+receiveMessage :: Client -> IO Text
+receiveMessage Client {clientConnection} =
+  Text.strip <$> WS.receiveData clientConnection
 
 sendMessage :: Client -> Message -> STM ()
 sendMessage Client {clientSendQueue} =

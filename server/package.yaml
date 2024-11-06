@@ -46,7 +46,7 @@ library:
   source-dirs: src
 
 executables:
-  contact-server-exe:
+  contact-server:
     main: Main.hs
     source-dirs: app
     ghc-options:
