@@ -9,8 +9,8 @@ module Server
   )
 where
 
-import qualified Control.Concurrent.Async as Async
-import Control.Concurrent.STM (STM, TBQueue, TVar)
+import Control.Concurrent.Async (race_)
+import Control.Concurrent.STM (STM, TBQueue, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
 import Control.Exception (finally)
 import Control.Monad (forever, join, when)
@@ -35,13 +35,18 @@ newtype Server = Server
   }
 
 data Client = Client
-  { clientConnection :: WS.Connection,
+  { -- TODO - different message type just for broadcasts
+    -- TODO - !! broadcast chan is unbounded !!
+    clientBroadcastChanIn :: TChan ClientMessage,
+    clientBroadcastChanOut :: TChan ClientMessage,
+    clientConnection :: WS.Connection,
     clientName :: Text,
     clientSendQueue :: TBQueue Message
   }
 
 data Message
-  = Hi
+  = Broadcast ClientMessage
+  | Hi
   | Inbound ClientMessage
 
 data ClientMessage
@@ -76,8 +81,8 @@ newtype HintMessage = HintMessage
 
 instance FromJSON HintMessage
 
-handleConnection :: Server -> WS.Connection -> IO ()
-handleConnection server@Server {serverClients} conn =
+handleConnection :: Server -> TChan ClientMessage -> WS.Connection -> IO ()
+handleConnection server@Server {serverClients} broadcastChannelIn conn =
   WS.withPingThread conn pingMillis onPing $ do
     name <- Text.strip <$> WS.receiveData conn
 
@@ -87,7 +92,7 @@ handleConnection server@Server {serverClients} conn =
         if Map.member name clients
           then pure Nothing
           else do
-            client <- newClient conn name
+            client <- newClient broadcastChannelIn conn name
             STM.writeTVar serverClients $ Map.insert name client clients
             pure $ Just client
 
@@ -106,9 +111,10 @@ handleConnection server@Server {serverClients} conn =
     pingMillis = 30
 
 handleClient :: Client -> IO ()
-handleClient client@Client {clientSendQueue} = do
+handleClient client@Client {clientBroadcastChanOut, clientSendQueue} = do
   STM.atomically $ sendMessage client Hi
-  _ <- Async.race receive serve
+  -- TODO: racing multiple threads this way seems jank
+  receive `race_` serve `race_` broadcast
   pure ()
   where
     receive :: IO ()
@@ -127,14 +133,24 @@ handleClient client@Client {clientSendQueue} = do
         continue <- handleMessage client msg
         when continue serve
 
+    broadcast :: IO ()
+    broadcast = forever $
+      STM.atomically $ do
+        msg <- STM.readTChan clientBroadcastChanOut
+        sendMessage client $ Broadcast msg
+
 handleMessage :: Client -> Message -> IO Bool
-handleMessage Client {clientName} message =
+handleMessage Client {clientBroadcastChanIn, clientConnection, clientName} message =
   case message of
+    Broadcast msg -> do
+      WS.sendTextData clientConnection $ Text.pack $ show msg
+      pure True
     Hi -> do
       putStrLn $ "hi hi " <> Text.unpack clientName <> "! welcome to the server :^)"
       pure True
     Inbound msg -> do
       putStrLn $ "received message: " <> show msg
+      STM.atomically $ STM.writeTChan clientBroadcastChanIn msg
       pure True
 
 removeClient :: Server -> Text -> IO ()
@@ -149,12 +165,15 @@ newServer = do
 clientSendQueueCapacity :: Natural
 clientSendQueueCapacity = 128
 
-newClient :: WS.Connection -> Text -> STM Client
-newClient conn name = do
+newClient :: TChan ClientMessage -> WS.Connection -> Text -> STM Client
+newClient broadcastChanIn conn name = do
+  broadCastChanOut <- STM.dupTChan broadcastChanIn
   sendQueue <- STM.newTBQueue clientSendQueueCapacity
   pure
     Client
-      { clientConnection = conn,
+      { clientBroadcastChanIn = broadcastChanIn,
+        clientBroadcastChanOut = broadCastChanOut,
+        clientConnection = conn,
         clientName = name,
         clientSendQueue = sendQueue
       }
