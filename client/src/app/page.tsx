@@ -49,16 +49,21 @@ type Msg =
   | { tag: "webSocketMessage"; data: unknown };
 
 type InboundMessage =
-  | { tag: "hint"; description: string; playerId: PlayerId }
-  | { tag: "declareContact"; players: { fromId: PlayerId; toId: PlayerId } }
+  | { tag: "shareHint"; data: { description: string; playerId: PlayerId } }
+  | {
+      tag: "declareContact";
+      data: { fromPlayerId: PlayerId; toPlayerId: PlayerId };
+    }
   | {
       // TODO - separate messages for failed and successful contacts?
       tag: "revealContact";
-      players: {
-        from: { id: PlayerId; word: string };
-        to: { id: PlayerId; word: string };
+      data: {
+        players: {
+          from: { id: PlayerId; word: string };
+          to: { id: PlayerId; word: string };
+        };
+        success: boolean;
       };
-      success: boolean;
     };
 
 type OutboundMessage =
@@ -106,21 +111,28 @@ const MOCK_MODEL: Model = {
 // TODO - refactor duplicate codec parts
 const inboundMessageCodec: Codec<InboundMessage> = C.oneOf([
   Codec.interface({
-    tag: C.exactly("hint"),
-    description: C.string,
-    playerId: playerIdCodec,
+    tag: C.exactly("shareHint"),
+    data: Codec.interface({
+      description: C.string,
+      playerId: playerIdCodec,
+    }),
   }),
   Codec.interface({
     tag: C.exactly("declareContact"),
-    players: Codec.interface({ fromId: playerIdCodec, toId: playerIdCodec }),
+    data: Codec.interface({
+      fromPlayerId: playerIdCodec,
+      toPlayerId: playerIdCodec,
+    }),
   }),
   Codec.interface({
     tag: C.exactly("revealContact"),
-    players: Codec.interface({
-      from: Codec.interface({ id: playerIdCodec, word: C.string }),
-      to: Codec.interface({ id: playerIdCodec, word: C.string }),
+    data: Codec.interface({
+      players: Codec.interface({
+        from: Codec.interface({ id: playerIdCodec, word: C.string }),
+        to: Codec.interface({ id: playerIdCodec, word: C.string }),
+      }),
+      success: C.boolean,
     }),
-    success: C.boolean,
   }),
 ]);
 
@@ -204,16 +216,19 @@ const update = (model: Model, msg: Msg): Model => {
 
         Right: (message) => {
           switch (message.tag) {
-            case "hint": {
+            case "shareHint": {
               return {
                 ...model,
                 players: Record.update(
                   model.players,
-                  [message.playerId],
+                  [message.data.playerId],
                   (player) => {
                     return {
                       ...player,
-                      hintState: { tag: "sharing", word: message.description },
+                      hintState: {
+                        tag: "sharing",
+                        word: message.data.description,
+                      },
                     };
                   }
                 ),
@@ -226,7 +241,7 @@ const update = (model: Model, msg: Msg): Model => {
                 countdown: 5000,
                 players: Record.update(
                   model.players,
-                  [message.players.fromId, message.players.toId],
+                  [message.data.fromPlayerId, message.data.toPlayerId],
                   (player): Player => {
                     return {
                       ...player,
@@ -238,15 +253,20 @@ const update = (model: Model, msg: Msg): Model => {
             }
 
             case "revealContact": {
-              const contactStatus = message.success ? "succeeded" : "failed";
+              const contactStatus = message.data.success
+                ? "succeeded"
+                : "failed";
 
               return {
                 ...model,
                 players: Record.updateWithData(
                   model.players,
                   [
-                    [message.players.from.id, message.players.from.word],
-                    [message.players.to.id, message.players.to.word],
+                    [
+                      message.data.players.from.id,
+                      message.data.players.from.word,
+                    ],
+                    [message.data.players.to.id, message.data.players.to.word],
                   ],
                   (player, word): Player => {
                     return {

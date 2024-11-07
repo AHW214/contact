@@ -1,3 +1,4 @@
+{-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 
 module Server
@@ -14,19 +15,14 @@ import Control.Concurrent.STM (STM, TBQueue, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
 import Control.Exception (finally)
 import Control.Monad (forever, join, when)
-import Data.Aeson
-  ( FromJSON (parseJSON),
-    Options (constructorTagModifier, sumEncoding),
-    SumEncoding (contentsFieldName),
-  )
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Casing (camelCase)
 import Data.ByteString (ByteString)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
-import GHC.Generics (Generic)
+import Message.Client (ClientMessage (..), ContactMessage (..), HintMessage (..))
+import Message.Server (DeclareContactMessage (..), ServerMessage (..), ShareHintMessage (..))
 import qualified Network.WebSockets as WS
 import Numeric.Natural (Natural)
 
@@ -37,51 +33,19 @@ newtype Server = Server
 data Client = Client
   { -- TODO - different message type just for broadcasts
     -- TODO - !! broadcast chan is unbounded !!
-    clientBroadcastChanIn :: TChan ClientMessage,
-    clientBroadcastChanOut :: TChan ClientMessage,
+    clientBroadcastChanIn :: TChan ServerMessage,
+    clientBroadcastChanOut :: TChan ServerMessage,
     clientConnection :: WS.Connection,
     clientName :: Text,
     clientSendQueue :: TBQueue Message
   }
 
 data Message
-  = Broadcast ClientMessage
+  = Broadcast ServerMessage
   | Hi
   | Inbound ClientMessage
 
-data ClientMessage
-  = Contact ContactMessage
-  | Hint HintMessage
-  deriving (Generic, Show)
-
-instance FromJSON ClientMessage where
-  parseJSON =
-    Aeson.genericParseJSON $
-      Aeson.defaultOptions
-        { constructorTagModifier = camelCase,
-          sumEncoding = sumEncodingOptions
-        }
-    where
-      sumEncodingOptions :: SumEncoding
-      sumEncodingOptions =
-        Aeson.defaultTaggedObject {contentsFieldName = "data"}
-
-data ContactMessage = ContactMessage
-  { playerId :: Text,
-    word :: Text
-  }
-  deriving (Generic, Show)
-
-instance FromJSON ContactMessage
-
-newtype HintMessage = HintMessage
-  { description :: Text
-  }
-  deriving (Generic, Show)
-
-instance FromJSON HintMessage
-
-handleConnection :: Server -> TChan ClientMessage -> WS.Connection -> IO ()
+handleConnection :: Server -> TChan ServerMessage -> WS.Connection -> IO ()
 handleConnection server@Server {serverClients} broadcastChannelIn conn =
   WS.withPingThread conn pingMillis onPing $ do
     name <- Text.strip <$> WS.receiveData conn
@@ -143,14 +107,22 @@ handleMessage :: Client -> Message -> IO Bool
 handleMessage Client {clientBroadcastChanIn, clientConnection, clientName} message =
   case message of
     Broadcast msg -> do
-      WS.sendTextData clientConnection $ Text.pack $ show msg
+      WS.sendTextData clientConnection $ Aeson.encode msg
       pure True
     Hi -> do
       putStrLn $ "hi hi " <> Text.unpack clientName <> "! welcome to the server :^)"
       pure True
     Inbound msg -> do
       putStrLn $ "received message: " <> show msg
-      STM.atomically $ STM.writeTChan clientBroadcastChanIn msg
+
+      let msgOut =
+            case msg of
+              Contact (ContactMessage {playerId}) ->
+                DeclareContact (DeclareContactMessage {fromPlayerId = clientName, toPlayerId = playerId})
+              Hint (HintMessage {description}) ->
+                ShareHint (ShareHintMessage {description, playerId = clientName})
+
+      STM.atomically $ STM.writeTChan clientBroadcastChanIn msgOut
       pure True
 
 removeClient :: Server -> Text -> IO ()
@@ -165,7 +137,7 @@ newServer = do
 clientSendQueueCapacity :: Natural
 clientSendQueueCapacity = 128
 
-newClient :: TChan ClientMessage -> WS.Connection -> Text -> STM Client
+newClient :: TChan ServerMessage -> WS.Connection -> Text -> STM Client
 newClient broadcastChanIn conn name = do
   broadCastChanOut <- STM.dupTChan broadcastChanIn
   sendQueue <- STM.newTBQueue clientSendQueueCapacity

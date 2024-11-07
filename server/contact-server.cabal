@@ -25,6 +25,8 @@ source-repository head
 
 library
   exposed-modules:
+      Message.Client
+      Message.Server
       Server
   other-modules:
       Paths_contact_server
