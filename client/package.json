@@ -9,7 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "next": "14.2.13",
+    "next": "^15.0.3",
     "purify-ts": "^2.1.0",
     "react": "^18",
     "react-dom": "^18",
@@ -17,7 +17,7 @@
   },
   "devDependencies": {
     "@coderspirit/nominal": "^4.1.1",
-    "@types/node": "^20",
+    "@types/node": "^20.17.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "postcss": "^8",

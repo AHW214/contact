@@ -1,7 +1,7 @@
 // TODO
 "use client";
 
-import { type Either, Left, Right } from "purify-ts";
+import { type Either, Left } from "purify-ts";
 import { Codec } from "purify-ts/Codec";
 import * as C from "purify-ts/Codec";
 import {
