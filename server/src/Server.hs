@@ -5,7 +5,8 @@ module Server
   ( Client (..),
     Message (..),
     Server (..),
-    handleConnection,
+    mkHttpApp,
+    mkWsApp,
     newServer,
   )
 where
@@ -15,16 +16,22 @@ import Control.Concurrent.STM (STM, TBQueue, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
 import Control.Exception (finally)
 import Control.Monad (forever, join, when)
+import Control.Monad.IO.Class (liftIO)
+import Data.Aeson (ToJSON)
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import GHC.Generics (Generic)
 import Message.Client (ClientMessage (..), ContactMessage (..), HintMessage (..))
 import Message.Server (DeclareContactMessage (..), ServerMessage (..), ShareHintMessage (..))
+import qualified Network.Wai as Wai
 import qualified Network.WebSockets as WS
 import Numeric.Natural (Natural)
+import Web.Scotty (get, scottyApp)
+import qualified Web.Scotty as Scotty
 
 newtype Server = Server
   { serverClients :: TVar (Map Text Client)
@@ -44,6 +51,30 @@ data Message
   = Broadcast ServerMessage
   | Hi
   | Inbound ClientMessage
+
+newtype RoomResponse = RoomResponse
+  { players :: [Text]
+  }
+  deriving (Generic)
+
+instance ToJSON RoomResponse
+
+mkHttpApp :: Server -> IO Wai.Application
+mkHttpApp Server {serverClients} = scottyApp $ do
+  get "/room/:roomId" $ do
+    -- TODO - use when rooms are implemented server-side
+    -- roomId <- Scotty.queryParam "roomId"
+
+    players <- liftIO $ STM.atomically $ do
+      clients <- STM.readTVar serverClients
+      pure $ Map.keys clients
+
+    Scotty.json $ RoomResponse {players}
+
+mkWsApp :: Server -> TChan ServerMessage -> WS.ServerApp
+mkWsApp server broadcastChannelIn pendingConnection = do
+  conn <- WS.acceptRequest pendingConnection
+  handleConnection server broadcastChannelIn conn
 
 handleConnection :: Server -> TChan ServerMessage -> WS.Connection -> IO ()
 handleConnection server@Server {serverClients} broadcastChannelIn conn =

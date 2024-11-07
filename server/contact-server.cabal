@@ -46,8 +46,12 @@ library
     , base >=4.7 && <5
     , bytestring
     , containers
+    , scotty
     , stm
     , text
+    , wai
+    , wai-websockets
+    , warp
     , websockets
   default-language: Haskell2010
 
@@ -72,8 +76,12 @@ executable contact-server
     , bytestring
     , contact-server
     , containers
+    , scotty
     , stm
     , text
+    , wai
+    , wai-websockets
+    , warp
     , websockets
   default-language: Haskell2010
 
@@ -99,7 +107,11 @@ test-suite contact-server-test
     , bytestring
     , contact-server
     , containers
+    , scotty
     , stm
     , text
+    , wai
+    , wai-websockets
+    , warp
     , websockets
   default-language: Haskell2010

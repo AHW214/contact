@@ -26,8 +26,12 @@ dependencies:
   - base >= 4.7 && < 5
   - bytestring
   - containers
+  - scotty
   - stm
   - text
+  - wai
+  - wai-websockets
+  - warp
   - websockets
 
 default-extensions:

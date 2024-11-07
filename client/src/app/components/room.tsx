@@ -34,6 +34,7 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
 
   const [model, _dispatch] = useReducer(update, initModel);
 
+  // TODO - update player list when players join / leave game
   const _ = useWebSocket(webSocketUrl, {
     queryParams: { roomId },
   });
