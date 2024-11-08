@@ -12,6 +12,7 @@ module Server
 where
 
 import Control.Concurrent.Async (race_)
+import qualified Control.Concurrent.Async as Async
 import Control.Concurrent.STM (STM, TBQueue, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
 import Control.Exception (finally)
@@ -24,6 +25,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.UUID (UUID)
+import qualified Data.UUID.V4 as UUID
 import GHC.Generics (Generic)
 import Message.Client
 import Message.Server
@@ -33,14 +36,15 @@ import Numeric.Natural (Natural)
 import Web.Scotty (get, scottyApp)
 import qualified Web.Scotty as Scotty
 
-newtype Server = Server
-  { serverClients :: TVar (Map Text Client)
+data Server = Server
+  { serverBroadcastChanIn :: TChan ServerMessage,
+    serverClients :: TVar (Map Text Client),
+    serverLobby :: TVar (Map UUID WS.Connection)
   }
 
 data Client = Client
   { -- TODO - different message type just for broadcasts
     -- TODO - !! broadcast chan is unbounded !!
-    clientBroadcastChanIn :: TChan ServerMessage,
     clientBroadcastChanOut :: TChan ServerMessage,
     clientConnection :: WS.Connection,
     clientName :: Text,
@@ -71,16 +75,32 @@ mkHttpApp Server {serverClients} = scottyApp $ do
 
     Scotty.json $ RoomResponse {players}
 
-mkWsApp :: Server -> TChan ServerMessage -> WS.ServerApp
-mkWsApp server broadcastChannelIn pendingConnection = do
+mkWsApp :: Server -> WS.ServerApp
+mkWsApp server pendingConnection = do
   conn <- WS.acceptRequest pendingConnection
-  handleConnection server broadcastChannelIn conn
+  handleConnection server conn
 
-handleConnection :: Server -> TChan ServerMessage -> WS.Connection -> IO ()
-handleConnection server@Server {serverClients} broadcastChannelIn conn =
+handleConnection :: Server -> WS.Connection -> IO ()
+handleConnection server@Server {serverBroadcastChanIn, serverClients, serverLobby} conn =
   WS.withPingThread conn pingMillis onPing $ do
-    client@Client {clientName} <- waitForPlayerName
-    handleClient client `finally` removeClient server clientName
+    sessionId <- UUID.nextRandom
+    STM.atomically $ STM.modifyTVar serverLobby (Map.insert sessionId conn)
+
+    broadcastChannelOut <- STM.atomically $ STM.dupTChan serverBroadcastChanIn
+    result <- Async.race (broadcast broadcastChannelOut) waitForPlayerName
+
+    case result of
+      Left _ ->
+        removeFromLobby server sessionId
+      Right client@Client {clientName} -> do
+        -- TODO - group with other STM computations in waitForPlayerName ?
+        removeFromLobby server sessionId
+
+        STM.atomically $
+          STM.writeTChan serverBroadcastChanIn $
+            JoinedGame JoinedGameMessage {playerName = clientName}
+
+        handleClient server client `finally` removeClient server clientName
   where
     waitForPlayerName :: IO Client
     waitForPlayerName = do
@@ -96,9 +116,21 @@ handleConnection server@Server {serverClients} broadcastChannelIn conn =
             if Map.member name clients
               then pure waitForPlayerName
               else do
-                client <- newClient broadcastChannelIn conn name
+                client <- newClient serverBroadcastChanIn conn name
                 STM.writeTVar serverClients $ Map.insert name client clients
                 pure $ pure client
+
+    broadcast :: TChan ServerMessage -> IO ()
+    broadcast broadcastChannelOut = forever $ do
+      -- TODO - use internal type for message? then convert before sending
+      msg <- STM.atomically $ STM.readTChan broadcastChannelOut
+      case msg of
+        LeftGame _ ->
+          WS.sendTextData conn $ Aeson.encode msg
+        JoinedGame _ ->
+          WS.sendTextData conn $ Aeson.encode msg
+        _ ->
+          pure ()
 
     onPing :: IO ()
     onPing = pure ()
@@ -106,8 +138,8 @@ handleConnection server@Server {serverClients} broadcastChannelIn conn =
     pingMillis :: Int
     pingMillis = 30
 
-handleClient :: Client -> IO ()
-handleClient client@Client {clientBroadcastChanOut, clientSendQueue} = do
+handleClient :: Server -> Client -> IO ()
+handleClient server client@Client {clientBroadcastChanOut, clientSendQueue} = do
   STM.atomically $ sendMessage client Hi
   -- TODO: racing multiple threads this way seems jank
   receive `race_` serve `race_` broadcast
@@ -126,7 +158,7 @@ handleClient client@Client {clientBroadcastChanOut, clientSendQueue} = do
     serve = join $ STM.atomically $ do
       msg <- STM.readTBQueue clientSendQueue
       pure $ do
-        continue <- handleMessage client msg
+        continue <- handleMessage server client msg
         when continue serve
 
     broadcast :: IO ()
@@ -135,11 +167,11 @@ handleClient client@Client {clientBroadcastChanOut, clientSendQueue} = do
         msg <- STM.readTChan clientBroadcastChanOut
         sendMessage client $ Broadcast msg
 
-handleMessage :: Client -> Message -> IO Bool
-handleMessage Client {clientBroadcastChanIn, clientConnection, clientName} message =
+handleMessage :: Server -> Client -> Message -> IO Bool
+handleMessage Server {serverBroadcastChanIn} Client {clientConnection, clientName} message =
   case message of
-    Broadcast msg -> do
-      WS.sendTextData clientConnection $ Aeson.encode msg
+    Broadcast _msg -> do
+      -- WS.sendTextData clientConnection $ Aeson.encode msg
       pure True
     Hi -> do
       putStrLn $ "hi hi " <> Text.unpack clientName <> "! welcome to the server :^)"
@@ -154,17 +186,29 @@ handleMessage Client {clientBroadcastChanIn, clientConnection, clientName} messa
               Hint (HintMessage {description}) ->
                 ShareHint (ShareHintMessage {description, playerId = clientName})
 
-      STM.atomically $ STM.writeTChan clientBroadcastChanIn msgOut
+      STM.atomically $ STM.writeTChan serverBroadcastChanIn msgOut
       pure True
 
-removeClient :: Server -> Text -> IO ()
-removeClient Server {serverClients} clientName = STM.atomically $ do
-  STM.modifyTVar' serverClients $ Map.delete clientName
+removeFromLobby :: Server -> UUID -> IO ()
+removeFromLobby Server {serverLobby} sessionId = STM.atomically $ do
+  STM.modifyTVar' serverLobby $ Map.delete sessionId
 
-newServer :: IO Server
-newServer = do
+removeClient :: Server -> Text -> IO ()
+removeClient Server {serverBroadcastChanIn, serverClients} clientName = STM.atomically $ do
+  STM.modifyTVar' serverClients $ Map.delete clientName
+  STM.writeTChan serverBroadcastChanIn $ LeftGame LeftGameMessage {playerName = clientName}
+
+newServer :: TChan ServerMessage -> IO Server
+newServer broadcastChanIn = do
   clients <- STM.newTVarIO Map.empty
-  pure Server {serverClients = clients}
+  lobby <- STM.newTVarIO Map.empty
+
+  pure
+    Server
+      { serverBroadcastChanIn = broadcastChanIn,
+        serverClients = clients,
+        serverLobby = lobby
+      }
 
 clientSendQueueCapacity :: Natural
 clientSendQueueCapacity = 128
@@ -175,8 +219,7 @@ newClient broadcastChanIn conn name = do
   sendQueue <- STM.newTBQueue clientSendQueueCapacity
   pure
     Client
-      { clientBroadcastChanIn = broadcastChanIn,
-        clientBroadcastChanOut = broadCastChanOut,
+      { clientBroadcastChanOut = broadCastChanOut,
         clientConnection = conn,
         clientName = name,
         clientSendQueue = sendQueue

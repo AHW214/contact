@@ -22,16 +22,16 @@ namespace Network {
   export type ClientMessage = { tag: "chooseName"; data: { name: string } };
 
   export type ServerMessage =
-    | { tag: "playerJoined"; data: { name: string } }
-    | { tag: "playerLeft"; data: { name: string } };
+    | { tag: "joinedGame"; data: { playerName: string } }
+    | { tag: "leftGame"; data: { playerName: string } };
 
   export const clientMessageCodec: Codec<ClientMessage> = C.oneOf([
     Codec_.tagged("chooseName", { name: C.string }),
   ]);
 
   export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
-    Codec_.tagged("playerJoined", { name: C.string }),
-    Codec_.tagged("playerLeft", { name: C.string }),
+    Codec_.tagged("joinedGame", { playerName: C.string }),
+    Codec_.tagged("leftGame", { playerName: C.string }),
   ]);
 }
 
@@ -54,6 +54,8 @@ type RoomProps = {
 const parseWebSocketData = (
   data: unknown
 ): Either<string, Network.ServerMessage> => {
+  console.log(data);
+
   if (typeof data !== "string") {
     return Left("websocket data not string");
   }
@@ -70,14 +72,24 @@ const handleServerMessage = (
   model: Model,
   msg: Network.ServerMessage
 ): Model => {
-  switch (msg.tag) {
-    case "playerJoined":
-      return model;
-    case "playerLeft":
-      return model;
-    default:
-      // IMPOSSIBLE CASE
-      return model;
+  if (msg.tag === "joinedGame" && model.state.tag === "waiting") {
+    return {
+      ...model,
+      state: {
+        ...model.state,
+        players: [...model.state.players, msg.data.playerName],
+      },
+    };
+  } else if (msg.tag === "leftGame" && model.state.tag === "waiting") {
+    return {
+      ...model,
+      state: {
+        ...model.state,
+        players: model.state.players.filter((p) => p !== msg.data.playerName),
+      },
+    };
+  } else {
+    return model;
   }
 };
 
@@ -108,7 +120,7 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
   const [model, dispatch] = useReducer(update, initModel);
 
   // TODO - update player list when players join / leave game
-  const { lastJsonMessage, readyState, sendJsonMessage } = useWebSocket(
+  const { lastMessage, readyState, sendJsonMessage } = useWebSocket(
     webSocketUrl,
     {
       queryParams: { roomId },
@@ -120,10 +132,10 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
   };
 
   useEffect(() => {
-    if (lastJsonMessage !== null) {
-      dispatch({ tag: "receivedServerMessage", data: lastJsonMessage });
+    if (lastMessage !== null) {
+      dispatch({ tag: "receivedServerMessage", data: lastMessage.data });
     }
-  }, [lastJsonMessage]);
+  }, [lastMessage]);
 
   switch (model.state.tag) {
     case "waiting": {
@@ -132,7 +144,7 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
       return (
         <div>
           <div>
-            {players.map((name) => (
+            {model.state.players.map((name) => (
               <div key={name}>{name}</div>
             ))}
           </div>

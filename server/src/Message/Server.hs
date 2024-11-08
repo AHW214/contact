@@ -1,5 +1,9 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+
 module Message.Server
   ( DeclareContactMessage (..),
+    JoinedGameMessage (..),
+    LeftGameMessage (..),
     ServerMessage (..),
     ShareHintMessage (..),
   )
@@ -17,6 +21,8 @@ import GHC.Generics (Generic)
 
 data ServerMessage
   = DeclareContact DeclareContactMessage
+  | JoinedGame JoinedGameMessage
+  | LeftGame LeftGameMessage
   | RevealContact
   | ShareHint ShareHintMessage
   deriving (Generic, Show)
@@ -40,6 +46,20 @@ data DeclareContactMessage = DeclareContactMessage
   deriving (Generic, Show)
 
 instance ToJSON DeclareContactMessage
+
+newtype LeftGameMessage = LeftGameMessage
+  { playerName :: Text
+  }
+  deriving (Generic, Show)
+
+instance ToJSON LeftGameMessage
+
+newtype JoinedGameMessage = JoinedGameMessage
+  { playerName :: Text
+  }
+  deriving (Generic, Show)
+
+instance ToJSON JoinedGameMessage
 
 data ShareHintMessage = ShareHintMessage
   { description :: Text,

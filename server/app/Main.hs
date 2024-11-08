@@ -10,10 +10,10 @@ import Server (mkHttpApp, mkWsApp, newServer)
 
 main :: IO ()
 main = do
-  server <- newServer
-  broadcastChannelIn <- STM.newBroadcastTChanIO
+  broadcastChanIn <- STM.newBroadcastTChanIO
+  server <- newServer broadcastChanIn
 
-  let wsApp = mkWsApp server broadcastChannelIn
+  let wsApp = mkWsApp server
   httpApp <- mkHttpApp server
 
   Warp.runSettings warpSettings $

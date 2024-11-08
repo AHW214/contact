@@ -49,6 +49,7 @@ library
     , scotty
     , stm
     , text
+    , uuid
     , wai
     , wai-websockets
     , warp
@@ -79,6 +80,7 @@ executable contact-server
     , scotty
     , stm
     , text
+    , uuid
     , wai
     , wai-websockets
     , warp
@@ -110,6 +112,7 @@ test-suite contact-server-test
     , scotty
     , stm
     , text
+    , uuid
     , wai
     , wai-websockets
     , warp
