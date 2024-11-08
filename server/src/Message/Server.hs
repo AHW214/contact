@@ -6,6 +6,7 @@ module Message.Server
     LeftGameMessage (..),
     ServerMessage (..),
     ShareHintMessage (..),
+    SyncGameMessage (..),
   )
 where
 
@@ -25,6 +26,7 @@ data ServerMessage
   | LeftGame LeftGameMessage
   | RevealContact
   | ShareHint ShareHintMessage
+  | SyncGame SyncGameMessage
   deriving (Generic, Show)
 
 instance ToJSON ServerMessage where
@@ -68,3 +70,11 @@ data ShareHintMessage = ShareHintMessage
   deriving (Generic, Show)
 
 instance ToJSON ShareHintMessage
+
+data SyncGameMessage = SyncGameMessage
+  { myPlayerName :: Text,
+    players :: [Text]
+  }
+  deriving (Generic, Show)
+
+instance ToJSON SyncGameMessage

@@ -24,7 +24,6 @@ import Data.ByteString (ByteString)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
-import qualified Data.Text as Text
 import Data.UUID (UUID)
 import qualified Data.UUID.V4 as UUID
 import GHC.Generics (Generic)
@@ -53,8 +52,8 @@ data Client = Client
 
 data Message
   = Broadcast ServerMessage
-  | Hi
   | Inbound ClientMessage
+  | Sync
 
 newtype RoomResponse = RoomResponse
   { players :: [Text]
@@ -140,7 +139,7 @@ handleConnection server@Server {serverBroadcastChanIn, serverClients, serverLobb
 
 handleClient :: Server -> Client -> IO ()
 handleClient server client@Client {clientBroadcastChanOut, clientSendQueue} = do
-  STM.atomically $ sendMessage client Hi
+  STM.atomically $ sendMessage client Sync
   -- TODO: racing multiple threads this way seems jank
   receive `race_` serve `race_` broadcast
   pure ()
@@ -168,13 +167,10 @@ handleClient server client@Client {clientBroadcastChanOut, clientSendQueue} = do
         sendMessage client $ Broadcast msg
 
 handleMessage :: Server -> Client -> Message -> IO Bool
-handleMessage Server {serverBroadcastChanIn} Client {clientConnection, clientName} message =
+handleMessage Server {serverBroadcastChanIn, serverClients} Client {clientConnection, clientName} message =
   case message of
     Broadcast _msg -> do
       -- WS.sendTextData clientConnection $ Aeson.encode msg
-      pure True
-    Hi -> do
-      putStrLn $ "hi hi " <> Text.unpack clientName <> "! welcome to the server :^)"
       pure True
     Inbound msg -> do
       putStrLn $ "received message: " <> show msg
@@ -187,6 +183,14 @@ handleMessage Server {serverBroadcastChanIn} Client {clientConnection, clientNam
                 ShareHint (ShareHintMessage {description, playerId = clientName})
 
       STM.atomically $ STM.writeTChan serverBroadcastChanIn msgOut
+      pure True
+    Sync -> do
+      clients <- STM.atomically $ STM.readTVar serverClients
+
+      WS.sendTextData clientConnection $
+        Aeson.encode $
+          SyncGame SyncGameMessage {myPlayerName = clientName, players = Map.keys clients}
+
       pure True
 
 removeFromLobby :: Server -> UUID -> IO ()

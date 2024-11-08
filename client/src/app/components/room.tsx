@@ -6,6 +6,11 @@ import { useEffect, useReducer } from "react";
 import useWebSocket from "react-use-websocket";
 
 import Input from "contact/app/components/input";
+import {
+  type Player,
+  type PlayerId,
+  playerIdCodec,
+} from "contact/app/data/player";
 
 namespace Codec_ {
   export const tagged = <T extends string, U extends { [x: string]: any }>(
@@ -22,21 +27,29 @@ namespace Network {
   export type ClientMessage = { tag: "chooseName"; data: { name: string } };
 
   export type ServerMessage =
-    | { tag: "joinedGame"; data: { playerName: string } }
-    | { tag: "leftGame"; data: { playerName: string } };
+    | { tag: "joinedGame"; data: { playerName: PlayerId } }
+    | { tag: "leftGame"; data: { playerName: PlayerId } }
+    | {
+        tag: "syncGame";
+        data: { myPlayerName: PlayerId; players: PlayerId[] };
+      };
 
   export const clientMessageCodec: Codec<ClientMessage> = C.oneOf([
     Codec_.tagged("chooseName", { name: C.string }),
   ]);
 
   export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
-    Codec_.tagged("joinedGame", { playerName: C.string }),
-    Codec_.tagged("leftGame", { playerName: C.string }),
+    Codec_.tagged("joinedGame", { playerName: playerIdCodec }),
+    Codec_.tagged("leftGame", { playerName: playerIdCodec }),
+    Codec_.tagged("syncGame", {
+      myPlayerName: playerIdCodec,
+      players: C.array(playerIdCodec),
+    }),
   ]);
 }
 
 type State =
-  | { tag: "playing"; playerName: string }
+  | { tag: "playing"; playerName: PlayerId; players: Record<PlayerId, Player> }
   | { tag: "waiting"; currentInput: string; players: string[] };
 
 type Model = { state: State };
@@ -86,6 +99,33 @@ const handleServerMessage = (
       state: {
         ...model.state,
         players: model.state.players.filter((p) => p !== msg.data.playerName),
+      },
+    };
+  } else if (msg.tag === "syncGame" && model.state.tag === "waiting") {
+    const players = msg.data.players.reduce<Record<PlayerId, Player>>(
+      (acc, playerId) => {
+        const MOCK_PLAYER: Player = {
+          contactState: undefined,
+          hintState: { tag: "thinking" },
+          id: playerId,
+          isTyping: false,
+          name: playerId,
+        };
+
+        return {
+          ...acc,
+          [playerId]: MOCK_PLAYER,
+        };
+      },
+      {}
+    );
+
+    return {
+      ...model,
+      state: {
+        tag: "playing",
+        playerName: msg.data.myPlayerName,
+        players,
       },
     };
   } else {
@@ -167,7 +207,7 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
     }
 
     case "playing": {
-      return <div>playing</div>;
+      return <div>{JSON.stringify(model.state)}</div>;
     }
 
     default: {
