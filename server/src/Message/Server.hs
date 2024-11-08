@@ -42,8 +42,8 @@ instance ToJSON ServerMessage where
         Aeson.defaultTaggedObject {contentsFieldName = "data"}
 
 data DeclaredContactMessage = DeclaredContactMessage
-  { fromPlayerId :: Text,
-    toPlayerId :: Text
+  { fromPlayer :: Text,
+    toPlayer :: Text
   }
   deriving (Generic, Show)
 
@@ -65,7 +65,7 @@ instance ToJSON JoinedGameMessage
 
 data SharedHintMessage = SharedHintMessage
   { description :: Text,
-    playerId :: Text
+    player :: Text
   }
   deriving (Generic, Show)
 

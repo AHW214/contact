@@ -103,6 +103,33 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
       };
     }
 
+    case "joinedGame": {
+      const MOCK_PLAYER: Player = {
+        contactState: undefined,
+        hintState: { tag: "thinking" },
+        id: msg.data.playerName,
+        isTyping: false,
+        name: msg.data.playerName,
+      };
+
+      console.log(msg.data.playerName);
+      console.log({ ...model.players, [msg.data.playerName]: MOCK_PLAYER });
+
+      return {
+        ...model,
+        players: { ...model.players, [msg.data.playerName]: MOCK_PLAYER },
+      };
+    }
+
+    case "leftGame": {
+      const { [msg.data.playerName]: _, ...restPlayers } = model.players;
+
+      return {
+        ...model,
+        players: restPlayers,
+      };
+    }
+
     default: {
       console.log(`useReducer(): ignoring message '${msg.tag}'`);
       return model;
@@ -151,8 +178,10 @@ const update = (model: Model, msg: Msg): Model => {
 
       return model;
 
-    case "receivedServerMessage":
+    case "receivedServerMessage": {
+      console.log(model);
       return handleServerMessage(model, msg.message);
+    }
 
     default:
       return model;
@@ -187,7 +216,13 @@ export default function Game({
 
   useEffect(() => {
     if (lastServerMessage !== undefined) {
-      dispatch({ tag: "receivedServerMessage", message: lastServerMessage });
+      console.log(
+        `GAME: dispatching server message: ${JSON.stringify(lastServerMessage)}`
+      );
+      dispatch({
+        tag: "receivedServerMessage",
+        message: lastServerMessage,
+      });
     }
   }, [lastServerMessage]);
 
@@ -228,7 +263,7 @@ export default function Game({
 
   const { [myPlayerName]: myPlayer, ...restPlayers } = model.players;
 
-  const contactingPlayers = Object.values(players)
+  const contactingPlayers = Object.values(model.players)
     .filter(({ contactState }) => contactState !== undefined)
     .slice(0, 2);
 
@@ -243,7 +278,7 @@ export default function Game({
       <WordDisplay target={MOCK_TARGET_WORD} />
       <Wordmaster id="0" name={MOCK_WORDMASTER} />
       <div className="flex gap-2">
-        {Object.values(players).map((player) => (
+        {Object.values(restPlayers).map((player) => (
           <PlayerView
             key={player.id}
             inputRef={inputRef}

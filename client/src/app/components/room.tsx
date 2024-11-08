@@ -1,33 +1,16 @@
 "use client";
 
-import { Codec, type Either, Left } from "purify-ts";
-import * as C from "purify-ts/Codec";
 import { useEffect, useReducer, useState } from "react";
 import useWebSocket from "react-use-websocket";
 
 import Game from "contact/app/components/game";
 import Input from "contact/app/components/input";
-import {
-  type Player,
-  type PlayerId,
-  playerIdCodec,
-} from "contact/app/data/player";
+import type { Player, PlayerId } from "contact/app/data/player";
 import {
   type ClientMessage,
   type ServerMessage,
   serverMessageCodec,
 } from "contact/app/network/message";
-
-namespace Codec_ {
-  export const tagged = <T extends string, U extends { [x: string]: any }>(
-    tag: T,
-    data: U
-  ) =>
-    Codec.interface({
-      tag: C.exactly(tag),
-      data: Codec.interface(data),
-    });
-}
 
 type State =
   | { tag: "playing"; playerName: PlayerId; players: Record<PlayerId, Player> }
@@ -163,6 +146,9 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
 
   useEffect(() => {
     if (lastServerMessage !== undefined) {
+      console.log(
+        `ROOM: dispatching server message: ${JSON.stringify(lastServerMessage)}`
+      );
       dispatch({ tag: "receivedServerMessage", message: lastServerMessage });
     }
   }, [lastServerMessage]);
@@ -199,6 +185,7 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
     case "playing": {
       return (
         <Game
+          // TODO - debugging why message dispatched many times
           lastServerMessage={lastServerMessage}
           myPlayerName={model.state.playerName}
           players={model.state.players}

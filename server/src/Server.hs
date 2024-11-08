@@ -95,6 +95,7 @@ handleConnection server@Server {serverBroadcastChanIn, serverClients, serverLobb
         -- TODO - group with other STM computations in waitForPlayerName ?
         removeFromLobby server sessionId
 
+        -- TODO - this sends redundant message to client who has just now joined too
         STM.atomically $
           STM.writeTChan serverBroadcastChanIn $
             JoinedGame JoinedGameMessage {playerName = clientName}
@@ -169,8 +170,8 @@ handleClient server client@Client {clientBroadcastChanOut, clientSendQueue} = do
 handleMessage :: Server -> Client -> Message -> IO Bool
 handleMessage Server {serverBroadcastChanIn, serverClients} Client {clientConnection, clientName} message =
   case message of
-    Broadcast _msg -> do
-      -- WS.sendTextData clientConnection $ Aeson.encode msg
+    Broadcast msg -> do
+      WS.sendTextData clientConnection $ Aeson.encode msg
       pure True
     Inbound msg -> do
       putStrLn $ "received message: " <> show msg
@@ -178,9 +179,9 @@ handleMessage Server {serverBroadcastChanIn, serverClients} Client {clientConnec
       let msgOut =
             case msg of
               Contact (ContactMessage {playerId}) ->
-                DeclaredContact (DeclaredContactMessage {fromPlayerId = clientName, toPlayerId = playerId})
+                DeclaredContact (DeclaredContactMessage {fromPlayer = clientName, toPlayer = playerId})
               Hint (HintMessage {description}) ->
-                SharedHint (SharedHintMessage {description, playerId = clientName})
+                SharedHint (SharedHintMessage {description, player = clientName})
 
       STM.atomically $ STM.writeTChan serverBroadcastChanIn msgOut
       pure True
