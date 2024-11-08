@@ -25,8 +25,8 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 import GHC.Generics (Generic)
-import Message.Client (ClientMessage (..), ContactMessage (..), HintMessage (..))
-import Message.Server (DeclareContactMessage (..), ServerMessage (..), ShareHintMessage (..))
+import Message.Client
+import Message.Server
 import qualified Network.Wai as Wai
 import qualified Network.WebSockets as WS
 import Numeric.Natural (Natural)
@@ -79,26 +79,27 @@ mkWsApp server broadcastChannelIn pendingConnection = do
 handleConnection :: Server -> TChan ServerMessage -> WS.Connection -> IO ()
 handleConnection server@Server {serverClients} broadcastChannelIn conn =
   WS.withPingThread conn pingMillis onPing $ do
-    name <- Text.strip <$> WS.receiveData conn
-
-    maybeClient <-
-      STM.atomically $ do
-        clients <- STM.readTVar serverClients
-        if Map.member name clients
-          then pure Nothing
-          else do
-            client <- newClient broadcastChannelIn conn name
-            STM.writeTVar serverClients $ Map.insert name client clients
-            pure $ Just client
-
-    case maybeClient of
-      Nothing ->
-        let byebye :: Text
-            byebye = "name already in use"
-         in WS.sendClose conn byebye
-      Just client@Client {clientName} ->
-        handleClient client `finally` removeClient server clientName
+    client@Client {clientName} <- waitForPlayerName
+    handleClient client `finally` removeClient server clientName
   where
+    waitForPlayerName :: IO Client
+    waitForPlayerName = do
+      msg <- WS.receiveData conn
+      case Aeson.eitherDecodeStrict msg of
+        Left err -> do
+          putStrLn $ "could not decode client message: " <> err
+          print msg
+          waitForPlayerName
+        Right (ChooseName ChooseNameMessage {name}) -> do
+          join $ STM.atomically $ do
+            clients <- STM.readTVar serverClients
+            if Map.member name clients
+              then pure waitForPlayerName
+              else do
+                client <- newClient broadcastChannelIn conn name
+                STM.writeTVar serverClients $ Map.insert name client clients
+                pure $ pure client
+
     onPing :: IO ()
     onPing = pure ()
 
