@@ -1,11 +1,11 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Message.Server
-  ( DeclareContactMessage (..),
+  ( DeclaredContactMessage (..),
     JoinedGameMessage (..),
     LeftGameMessage (..),
     ServerMessage (..),
-    ShareHintMessage (..),
+    SharedHintMessage (..),
     SyncGameMessage (..),
   )
 where
@@ -21,11 +21,11 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 
 data ServerMessage
-  = DeclareContact DeclareContactMessage
+  = DeclaredContact DeclaredContactMessage
   | JoinedGame JoinedGameMessage
   | LeftGame LeftGameMessage
-  | RevealContact
-  | ShareHint ShareHintMessage
+  | RevealedContact
+  | SharedHint SharedHintMessage
   | SyncGame SyncGameMessage
   deriving (Generic, Show)
 
@@ -41,13 +41,13 @@ instance ToJSON ServerMessage where
       sumEncodingOptions =
         Aeson.defaultTaggedObject {contentsFieldName = "data"}
 
-data DeclareContactMessage = DeclareContactMessage
+data DeclaredContactMessage = DeclaredContactMessage
   { fromPlayerId :: Text,
     toPlayerId :: Text
   }
   deriving (Generic, Show)
 
-instance ToJSON DeclareContactMessage
+instance ToJSON DeclaredContactMessage
 
 newtype LeftGameMessage = LeftGameMessage
   { playerName :: Text
@@ -63,13 +63,13 @@ newtype JoinedGameMessage = JoinedGameMessage
 
 instance ToJSON JoinedGameMessage
 
-data ShareHintMessage = ShareHintMessage
+data SharedHintMessage = SharedHintMessage
   { description :: Text,
     playerId :: Text
   }
   deriving (Generic, Show)
 
-instance ToJSON ShareHintMessage
+instance ToJSON SharedHintMessage
 
 data SyncGameMessage = SyncGameMessage
   { myPlayerName :: Text,

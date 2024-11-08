@@ -178,9 +178,9 @@ handleMessage Server {serverBroadcastChanIn, serverClients} Client {clientConnec
       let msgOut =
             case msg of
               Contact (ContactMessage {playerId}) ->
-                DeclareContact (DeclareContactMessage {fromPlayerId = clientName, toPlayerId = playerId})
+                DeclaredContact (DeclaredContactMessage {fromPlayerId = clientName, toPlayerId = playerId})
               Hint (HintMessage {description}) ->
-                ShareHint (ShareHintMessage {description, playerId = clientName})
+                SharedHint (SharedHintMessage {description, playerId = clientName})
 
       STM.atomically $ STM.writeTChan serverBroadcastChanIn msgOut
       pure True

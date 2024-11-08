@@ -2,15 +2,21 @@
 
 import { Codec, type Either, Left } from "purify-ts";
 import * as C from "purify-ts/Codec";
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useState } from "react";
 import useWebSocket from "react-use-websocket";
 
+import Game from "contact/app/components/game";
 import Input from "contact/app/components/input";
 import {
   type Player,
   type PlayerId,
   playerIdCodec,
 } from "contact/app/data/player";
+import {
+  type ClientMessage,
+  type ServerMessage,
+  serverMessageCodec,
+} from "contact/app/network/message";
 
 namespace Codec_ {
   export const tagged = <T extends string, U extends { [x: string]: any }>(
@@ -23,31 +29,6 @@ namespace Codec_ {
     });
 }
 
-namespace Network {
-  export type ClientMessage = { tag: "chooseName"; data: { name: string } };
-
-  export type ServerMessage =
-    | { tag: "joinedGame"; data: { playerName: PlayerId } }
-    | { tag: "leftGame"; data: { playerName: PlayerId } }
-    | {
-        tag: "syncGame";
-        data: { myPlayerName: PlayerId; players: PlayerId[] };
-      };
-
-  export const clientMessageCodec: Codec<ClientMessage> = C.oneOf([
-    Codec_.tagged("chooseName", { name: C.string }),
-  ]);
-
-  export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
-    Codec_.tagged("joinedGame", { playerName: playerIdCodec }),
-    Codec_.tagged("leftGame", { playerName: playerIdCodec }),
-    Codec_.tagged("syncGame", {
-      myPlayerName: playerIdCodec,
-      players: C.array(playerIdCodec),
-    }),
-  ]);
-}
-
 type State =
   | { tag: "playing"; playerName: PlayerId; players: Record<PlayerId, Player> }
   | { tag: "waiting"; currentInput: string; players: string[] };
@@ -56,7 +37,7 @@ type Model = { state: State };
 
 type Msg =
   | { tag: "changedInput"; value: string }
-  | { tag: "receivedServerMessage"; data: unknown };
+  | { tag: "receivedServerMessage"; message: ServerMessage };
 
 type RoomProps = {
   players: string[];
@@ -64,27 +45,32 @@ type RoomProps = {
   webSocketUrl: string;
 };
 
-const parseWebSocketData = (
-  data: unknown
-): Either<string, Network.ServerMessage> => {
+const parseWebSocketData = (data: unknown): ServerMessage | undefined => {
   console.log(data);
 
   if (typeof data !== "string") {
-    return Left("websocket data not string");
+    console.log("websocket data is not a string");
+    return undefined;
   }
 
   try {
     const dataJson = JSON.parse(data);
-    return Network.serverMessageCodec.decode(dataJson);
+    return serverMessageCodec.decode(dataJson).caseOf({
+      Left: (err) => {
+        console.log(`failed to parse server websocket message: ${err}`);
+        return undefined;
+      },
+      Right: (message) => {
+        return message;
+      },
+    });
   } catch (err) {
-    return Left(`failed to parse websocket data: ${err}`);
+    console.log(`failed to parse websocket data: ${err}`);
+    return undefined;
   }
 };
 
-const handleServerMessage = (
-  model: Model,
-  msg: Network.ServerMessage
-): Model => {
+const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
   if (msg.tag === "joinedGame" && model.state.tag === "waiting") {
     return {
       ...model,
@@ -135,16 +121,7 @@ const handleServerMessage = (
 
 const update = (model: Model, msg: Msg): Model => {
   if (msg.tag === "receivedServerMessage") {
-    return parseWebSocketData(msg.data).caseOf({
-      Left: (err) => {
-        console.log(`failed to parse server websocket message: ${err}`);
-        return model;
-      },
-
-      Right: (message) => {
-        return handleServerMessage(model, message);
-      },
-    });
+    return handleServerMessage(model, msg.message);
   } else if (msg.tag === "changedInput" && model.state.tag === "waiting") {
     return { ...model, state: { ...model.state, currentInput: msg.value } };
   } else {
@@ -159,6 +136,10 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
 
   const [model, dispatch] = useReducer(update, initModel);
 
+  const [lastServerMessage, setLastServerMessage] = useState<
+    ServerMessage | undefined
+  >(undefined);
+
   // TODO - update player list when players join / leave game
   const { lastMessage, readyState, sendJsonMessage } = useWebSocket(
     webSocketUrl,
@@ -167,15 +148,24 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
     }
   );
 
-  const sendServer = (msg: Network.ClientMessage): void => {
+  const sendServer = (msg: ClientMessage): void => {
     sendJsonMessage(msg);
   };
 
   useEffect(() => {
     if (lastMessage !== null) {
-      dispatch({ tag: "receivedServerMessage", data: lastMessage.data });
+      const serverMessage = parseWebSocketData(lastMessage.data);
+      if (serverMessage !== undefined) {
+        setLastServerMessage(serverMessage);
+      }
     }
   }, [lastMessage]);
+
+  useEffect(() => {
+    if (lastServerMessage !== undefined) {
+      dispatch({ tag: "receivedServerMessage", message: lastServerMessage });
+    }
+  }, [lastServerMessage]);
 
   switch (model.state.tag) {
     case "waiting": {
@@ -207,7 +197,14 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
     }
 
     case "playing": {
-      return <div>{JSON.stringify(model.state)}</div>;
+      return (
+        <Game
+          lastServerMessage={lastServerMessage}
+          myPlayerName={model.state.playerName}
+          players={model.state.players}
+          sendServer={sendServer}
+        />
+      );
     }
 
     default: {
