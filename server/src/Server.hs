@@ -15,7 +15,7 @@ import Control.Concurrent.Async (race_)
 import qualified Control.Concurrent.Async as Async
 import Control.Concurrent.STM (STM, TBQueue, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
-import Control.Exception (finally)
+import Control.Exception (catch, finally, throwIO)
 import Control.Monad (forever, join, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (ToJSON)
@@ -73,6 +73,8 @@ mkHttpApp Server {serverGame} = scottyApp $ do
       game <- STM.readTVar serverGame
       pure $ Map.keys game
 
+    liftIO $ putStrLn $ "current players: " <> show players
+
     Scotty.json $ RoomResponse {players}
 
 mkWsApp :: Server -> WS.ServerApp
@@ -101,7 +103,9 @@ handleConnection server@Server {serverBroadcastChanIn, serverGame, serverLobby} 
           STM.writeTChan serverBroadcastChanIn $
             JoinedGame JoinedGameMessage {playerName}
 
-        handlePlayer server player `finally` removeFromGame server playerName
+        handlePlayer server player `finally` do
+          putStrLn $ "removing player " <> show playerName
+          removeFromGame server playerName
   where
     waitForPlayerName :: IO Player
     waitForPlayerName = do
@@ -140,7 +144,7 @@ handleConnection server@Server {serverBroadcastChanIn, serverGame, serverLobby} 
     pingMillis = 30
 
 handlePlayer :: Server -> Player -> IO ()
-handlePlayer server player@Player {playerBroadcastChanOut, playerSendQueue} = do
+handlePlayer server player@Player {playerBroadcastChanOut, playerName, playerSendQueue} = do
   STM.atomically $ sendMessage player Sync
   -- TODO: racing multiple threads this way seems jank
   receive `race_` serve `race_` broadcast
@@ -148,12 +152,17 @@ handlePlayer server player@Player {playerBroadcastChanOut, playerSendQueue} = do
   where
     receive :: IO ()
     receive = forever $ do
-      msg <- receiveMessage player
+      msg <- receiveMessage player `catch` onDisconnect
       case Aeson.eitherDecodeStrict msg of
         Left err ->
           putStrLn $ "could not decode client message: " <> err
         Right clientMessage ->
           STM.atomically $ sendMessage player $ Inbound clientMessage
+
+    onDisconnect :: WS.ConnectionException -> IO a
+    onDisconnect ex = do
+      putStrLn $ "player " <> show playerName <> " disconnected: " <> show ex
+      throwIO ex
 
     serve :: IO ()
     serve = join $ STM.atomically $ do
