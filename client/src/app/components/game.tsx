@@ -112,9 +112,6 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
         name: msg.data.playerName,
       };
 
-      console.log(msg.data.playerName);
-      console.log({ ...model.players, [msg.data.playerName]: MOCK_PLAYER });
-
       return {
         ...model,
         players: { ...model.players, [msg.data.playerName]: MOCK_PLAYER },
@@ -179,7 +176,6 @@ const update = (model: Model, msg: Msg): Model => {
       return model;
 
     case "receivedServerMessage": {
-      console.log(model);
       return handleServerMessage(model, msg.message);
     }
 

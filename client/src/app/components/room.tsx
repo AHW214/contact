@@ -4,7 +4,7 @@ import { useEffect, useReducer, useState } from "react";
 import useWebSocket from "react-use-websocket";
 
 import Game from "contact/app/components/game";
-import Input from "contact/app/components/input";
+import Lobby from "contact/app/components/lobby";
 import type { Player, PlayerId } from "contact/app/data/player";
 import {
   type ClientMessage,
@@ -13,23 +13,25 @@ import {
 } from "contact/app/network/message";
 
 type State =
-  | { tag: "playing"; playerName: PlayerId; players: Record<PlayerId, Player> }
-  | { tag: "waiting"; currentInput: string; players: string[] };
+  | {
+      tag: "playing";
+      myPlayerName: PlayerId;
+      players: Record<PlayerId, Player>;
+    }
+  | { tag: "waiting"; playersInGame: string[] };
 
 type Model = { state: State };
 
-type Msg =
-  | { tag: "changedInput"; value: string }
-  | { tag: "receivedServerMessage"; message: ServerMessage };
+type Msg = { tag: "receivedServerMessage"; message: ServerMessage };
 
 type RoomProps = {
-  players: string[];
+  playersInGame: string[];
   roomId: string;
   webSocketUrl: string;
 };
 
 const parseWebSocketData = (data: unknown): ServerMessage | undefined => {
-  console.log(data);
+  console.log(`received websocket message: "${data}"`);
 
   if (typeof data !== "string") {
     console.log("websocket data is not a string");
@@ -54,24 +56,10 @@ const parseWebSocketData = (data: unknown): ServerMessage | undefined => {
 };
 
 const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
-  if (msg.tag === "joinedGame" && model.state.tag === "waiting") {
-    return {
-      ...model,
-      state: {
-        ...model.state,
-        players: [...model.state.players, msg.data.playerName],
-      },
-    };
-  } else if (msg.tag === "leftGame" && model.state.tag === "waiting") {
-    return {
-      ...model,
-      state: {
-        ...model.state,
-        players: model.state.players.filter((p) => p !== msg.data.playerName),
-      },
-    };
-  } else if (msg.tag === "syncGame" && model.state.tag === "waiting") {
-    const players = msg.data.players.reduce<Record<PlayerId, Player>>(
+  if (msg.tag === "syncGame" && model.state.tag === "waiting") {
+    const { players, myPlayerName } = msg.data;
+
+    const mockPlayers = players.reduce<Record<PlayerId, Player>>(
       (acc, playerId) => {
         const MOCK_PLAYER: Player = {
           contactState: undefined,
@@ -93,8 +81,8 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
       ...model,
       state: {
         tag: "playing",
-        playerName: msg.data.myPlayerName,
-        players,
+        myPlayerName,
+        players: mockPlayers,
       },
     };
   } else {
@@ -105,16 +93,18 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 const update = (model: Model, msg: Msg): Model => {
   if (msg.tag === "receivedServerMessage") {
     return handleServerMessage(model, msg.message);
-  } else if (msg.tag === "changedInput" && model.state.tag === "waiting") {
-    return { ...model, state: { ...model.state, currentInput: msg.value } };
   } else {
     return model;
   }
 };
 
-export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
+export default function Room({
+  playersInGame,
+  roomId,
+  webSocketUrl,
+}: RoomProps) {
   const initModel: Model = {
-    state: { tag: "waiting", currentInput: "", players },
+    state: { tag: "waiting", playersInGame },
   };
 
   const [model, dispatch] = useReducer(update, initModel);
@@ -123,7 +113,7 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
     ServerMessage | undefined
   >(undefined);
 
-  // TODO - update player list when players join / leave game
+  // TODO - handle websocket readyState
   const { lastMessage, readyState, sendJsonMessage } = useWebSocket(
     webSocketUrl,
     {
@@ -135,6 +125,8 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
     sendJsonMessage(msg);
   };
 
+  // TODO - chaining useEffect() for message -> serverMessage feels kinda mmmmmmmmm
+  // custom hook time?
   useEffect(() => {
     if (lastMessage !== null) {
       const serverMessage = parseWebSocketData(lastMessage.data);
@@ -155,40 +147,26 @@ export default function Room({ players, roomId, webSocketUrl }: RoomProps) {
 
   switch (model.state.tag) {
     case "waiting": {
-      const chosenName = model.state.currentInput;
+      const { playersInGame } = model.state;
 
       return (
-        <div>
-          <div>
-            {model.state.players.map((name) => (
-              <div key={name}>{name}</div>
-            ))}
-          </div>
-          <h1>choose a name</h1>
-          <Input
-            placeholder="怎么称呼你哦～"
-            onChange={(ev) => {
-              dispatch({ tag: "changedInput", value: ev.target.value });
-            }}
-            onEnter={() => {
-              sendServer({
-                tag: "chooseName",
-                data: { name: chosenName },
-              });
-            }}
-            value={chosenName}
-          />
-        </div>
+        <Lobby
+          lastServerMessage={lastServerMessage}
+          playersInGame={playersInGame}
+          sendServer={sendServer}
+        />
       );
     }
 
     case "playing": {
+      const { myPlayerName: playerName, players } = model.state;
+
       return (
         <Game
           // TODO - debugging why message dispatched many times
           lastServerMessage={lastServerMessage}
-          myPlayerName={model.state.playerName}
-          players={model.state.players}
+          myPlayerName={playerName}
+          players={players}
           sendServer={sendServer}
         />
       );
