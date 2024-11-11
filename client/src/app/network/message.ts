@@ -12,10 +12,16 @@ namespace Codec_ {
       tag: C.exactly(tag),
       data: Codec.interface(data),
     });
+
+  export const nullary = <T extends string>(tag: T) =>
+    Codec.interface({
+      tag: C.exactly(tag),
+    });
 }
 
 export type ClientMessage =
   | { tag: "chooseName"; data: { name: string } }
+  | { tag: "clearHint" }
   | { tag: "contact"; data: { player: PlayerId; word: string } }
   | { tag: "disconnect" }
   | { tag: "hint"; data: { description: string } };
@@ -23,6 +29,7 @@ export type ClientMessage =
 export type SyncGamePlayer = { name: PlayerId; message: string };
 
 export type ServerMessage =
+  | { tag: "clearedHint"; data: { playerName: PlayerId } }
   | {
       tag: "declaredContact";
       data: { fromPlayer: PlayerId; toPlayer: PlayerId };
@@ -46,12 +53,13 @@ export type ServerMessage =
       };
     };
 
-export const clientMessageCodec: Codec<ClientMessage> = C.oneOf([
-  Codec_.tagged("chooseName", { name: C.string }),
-  Codec.interface({ tag: C.exactly("disconnect") }),
-  Codec_.tagged("contact", { player: playerIdCodec, word: C.string }),
-  Codec_.tagged("hint", { description: C.string }),
-]);
+// export const clientMessageCodec: Codec<ClientMessage> = C.oneOf([
+//   Codec_.tagged("chooseName", { name: C.string }),
+//   Codec_.nullary("clearHint"),
+//   Codec_.tagged("contact", { player: playerIdCodec, word: C.string }),
+//   Codec_.nullary("disconnect"),
+//   Codec_.tagged("hint", { description: C.string }),
+// ]);
 
 const syncGamePlayerCodec: Codec<SyncGamePlayer> = Codec.interface({
   name: playerIdCodec,
@@ -59,6 +67,7 @@ const syncGamePlayerCodec: Codec<SyncGamePlayer> = Codec.interface({
 });
 
 export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
+  Codec_.tagged("clearedHint", { playerName: playerIdCodec }),
   Codec_.tagged("declaredContact", {
     fromPlayer: playerIdCodec,
     toPlayer: playerIdCodec,

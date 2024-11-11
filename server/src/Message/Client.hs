@@ -24,7 +24,8 @@ import Data.Text (Text)
 import GHC.Generics (Generic, Rep)
 
 data ClientMessage
-  = Contact ContactMessage
+  = ClearHint
+  | Contact ContactMessage
   | Disconnect
   | Hint HintMessage
   deriving (Generic, Show)

@@ -50,6 +50,24 @@ type GameProps = {
 
 const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
   switch (msg.tag) {
+    case "clearedHint": {
+      return {
+        ...model,
+        players: Record.update(
+          model.players,
+          [msg.data.playerName],
+          (player) => {
+            return {
+              ...player,
+              hintState: {
+                tag: "thinking",
+              },
+            };
+          }
+        ),
+      };
+    }
+
     case "sharedHint": {
       return {
         ...model,
@@ -226,6 +244,10 @@ export default function Game({
     const onKeyup = (ev: KeyboardEvent) => {
       if (ev.key === "Escape") {
         dispatch({ tag: "clickedEscape" });
+
+        sendServer({
+          tag: "clearHint",
+        });
       }
     };
 

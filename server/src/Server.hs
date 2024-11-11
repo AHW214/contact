@@ -187,15 +187,19 @@ handleMessage server player@Player {playerName} message =
       putStrLn $ "received message: " <> show msg
 
       case msg of
+        ClearHint -> do
+          let msgOut = ClearedHint $ ClearedHintMessage {playerName}
+          STM.atomically $ broadcastMessage server msgOut
+          pure True
         Contact (ContactMessage {playerId}) -> do
-          let msgOut = DeclaredContact (DeclaredContactMessage {fromPlayer = playerName, toPlayer = playerId})
+          let msgOut = DeclaredContact $ DeclaredContactMessage {fromPlayer = playerName, toPlayer = playerId}
           STM.atomically $ broadcastMessage server msgOut
           pure True
         Disconnect -> do
           putStrLn $ "player " <> show playerName <> " disconnected"
           pure False
         Hint (HintMessage {description}) -> do
-          let msgOut = SharedHint (SharedHintMessage {description, player = playerName})
+          let msgOut = SharedHint $ SharedHintMessage {description, player = playerName}
           STM.atomically $ do
             modifyPlayer server player $ \p -> p {playerMessage = description}
             broadcastMessage server msgOut

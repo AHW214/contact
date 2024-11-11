@@ -1,7 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
 module Message.Server
-  ( DeclaredContactMessage (..),
+  ( ClearedHintMessage (..),
+    DeclaredContactMessage (..),
     JoinedGameMessage (..),
     LeftGameMessage (..),
     ServerMessage (..),
@@ -23,7 +24,8 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 
 data ServerMessage
-  = DeclaredContact DeclaredContactMessage
+  = ClearedHint ClearedHintMessage
+  | DeclaredContact DeclaredContactMessage
   | JoinedGame JoinedGameMessage
   | LeftGame LeftGameMessage
   | RevealedContact
@@ -42,6 +44,13 @@ instance ToJSON ServerMessage where
       sumEncodingOptions :: SumEncoding
       sumEncodingOptions =
         Aeson.defaultTaggedObject {contentsFieldName = "data"}
+
+newtype ClearedHintMessage = ClearedHintMessage
+  { playerName :: Text
+  }
+  deriving (Generic, Show)
+
+instance ToJSON ClearedHintMessage
 
 data DeclaredContactMessage = DeclaredContactMessage
   { fromPlayer :: Text,
