@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer } from "react";
 import useWebSocket from "react-use-websocket";
 
 import Game from "contact/app/components/game";
@@ -112,10 +112,6 @@ export default function Room({
 
   const [model, dispatch] = useReducer(update, initModel);
 
-  const [lastServerMessage, setLastServerMessage] = useState<
-    ServerMessage | undefined
-  >(undefined);
-
   // TODO - handle websocket readyState
   const { lastMessage, readyState, sendJsonMessage } = useWebSocket(
     webSocketUrl,
@@ -128,15 +124,8 @@ export default function Room({
     sendJsonMessage(msg);
   };
 
-  // TODO - chaining useEffect() for message -> serverMessage feels kinda mmmmmmmmm
-  // custom hook time?
-  useEffect(() => {
-    if (lastMessage !== null) {
-      const serverMessage = parseWebSocketData(lastMessage.data);
-      if (serverMessage !== undefined) {
-        setLastServerMessage(serverMessage);
-      }
-    }
+  const lastServerMessage: ServerMessage | undefined = useMemo(() => {
+    return lastMessage ? parseWebSocketData(lastMessage.data) : undefined;
   }, [lastMessage]);
 
   useEffect(() => {
