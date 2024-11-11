@@ -1,4 +1,4 @@
-export const updateWithData = <K extends string | number | symbol, V, T>(
+export const updateManyWithData = <K extends string | number | symbol, V, T>(
   record: Record<K, V>,
   keysAndData: [K, T][],
   updateFn: (value: V, data: T) => V
@@ -19,11 +19,19 @@ export const updateWithData = <K extends string | number | symbol, V, T>(
   );
 };
 
-export const update = <K extends string | number | symbol, V>(
+export const updateMany = <K extends string | number | symbol, V>(
   record: Record<K, V>,
   keys: K[],
   updateFn: (value: V) => V
 ): Record<K, V> => {
   const keysAndData: [K, undefined][] = keys.map((key) => [key, undefined]);
-  return updateWithData(record, keysAndData, updateFn);
+  return updateManyWithData(record, keysAndData, updateFn);
+};
+
+export const update = <K extends string | number | symbol, V>(
+  record: Record<K, V>,
+  key: K,
+  updateFn: (value: V) => V
+): Record<K, V> => {
+  return updateMany(record, [key], updateFn);
 };

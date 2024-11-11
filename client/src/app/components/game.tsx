@@ -48,35 +48,37 @@ type GameProps = {
   sendServer: (msg: ClientMessage) => void;
 };
 
+const COUNTDOWN_TIME_MILLIS = 5000;
+
 const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
   switch (msg.tag) {
     case "clearedHint": {
+      const { playerName } = msg.data;
+
       return {
         ...model,
-        players: Record.update(
-          model.players,
-          [msg.data.playerName],
-          (player) => {
-            return {
-              ...player,
-              hintState: {
-                tag: "thinking",
-              },
-            };
-          }
-        ),
+        players: Record.update(model.players, playerName, (player) => {
+          return {
+            ...player,
+            hintState: {
+              tag: "thinking",
+            },
+          };
+        }),
       };
     }
 
     case "sharedHint": {
+      const { description, player } = msg.data;
+
       return {
         ...model,
-        players: Record.update(model.players, [msg.data.player], (player) => {
+        players: Record.update(model.players, player, (player) => {
           return {
             ...player,
             hintState: {
               tag: "sharing",
-              word: msg.data.description,
+              word: description,
             },
           };
         }),
@@ -84,12 +86,14 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
     }
 
     case "declaredContact": {
+      const { fromPlayer, toPlayer } = msg.data;
+
       return {
         ...model,
-        countdown: 5000,
-        players: Record.update(
+        countdown: COUNTDOWN_TIME_MILLIS,
+        players: Record.updateMany(
           model.players,
-          [msg.data.fromPlayer, msg.data.toPlayer],
+          [fromPlayer, toPlayer],
           (player): Player => {
             return {
               ...player,
@@ -101,15 +105,16 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
     }
 
     case "revealedContact": {
-      const contactStatus = msg.data.success ? "succeeded" : "failed";
+      const { from, success, to } = msg.data;
+      const contactStatus = success ? "succeeded" : "failed";
 
       return {
         ...model,
-        players: Record.updateWithData(
+        players: Record.updateManyWithData(
           model.players,
           [
-            [msg.data.from.player, msg.data.from.word],
-            [msg.data.to.player, msg.data.to.word],
+            [from.player, from.word],
+            [to.player, to.word],
           ],
           (player, word): Player => {
             return {
@@ -122,22 +127,25 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
     }
 
     case "joinedGame": {
+      const { playerName } = msg.data;
+
       const MOCK_PLAYER: Player = {
         contactState: undefined,
         hintState: { tag: "thinking" },
-        id: msg.data.playerName,
+        id: playerName,
         isTyping: false,
-        name: msg.data.playerName,
+        name: playerName,
       };
 
       return {
         ...model,
-        players: { ...model.players, [msg.data.playerName]: MOCK_PLAYER },
+        players: { ...model.players, [playerName]: MOCK_PLAYER },
       };
     }
 
     case "leftGame": {
-      const { [msg.data.playerName]: _, ...restPlayers } = model.players;
+      const { playerName } = msg.data;
+      const { [playerName]: _, ...restPlayers } = model.players;
 
       return {
         ...model,
