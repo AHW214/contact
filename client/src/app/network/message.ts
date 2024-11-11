@@ -19,6 +19,8 @@ export type ClientMessage =
   | { tag: "contact"; data: { player: PlayerId; word: string } }
   | { tag: "hint"; data: { description: string } };
 
+export type SyncGamePlayer = { name: PlayerId; message: string };
+
 export type ServerMessage =
   | {
       tag: "declaredContact";
@@ -37,7 +39,10 @@ export type ServerMessage =
   | { tag: "sharedHint"; data: { description: string; player: PlayerId } }
   | {
       tag: "syncGame";
-      data: { myPlayerName: PlayerId; players: PlayerId[] };
+      data: {
+        myPlayerName: PlayerId;
+        players: Record<PlayerId, SyncGamePlayer>;
+      };
     };
 
 export const clientMessageCodec: Codec<ClientMessage> = C.oneOf([
@@ -45,6 +50,11 @@ export const clientMessageCodec: Codec<ClientMessage> = C.oneOf([
   Codec_.tagged("contact", { player: playerIdCodec, word: C.string }),
   Codec_.tagged("hint", { description: C.string }),
 ]);
+
+const syncGamePlayerCodec: Codec<SyncGamePlayer> = Codec.interface({
+  name: playerIdCodec,
+  message: C.string,
+});
 
 export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
   Codec_.tagged("declaredContact", {
@@ -61,6 +71,6 @@ export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
   Codec_.tagged("sharedHint", { description: C.string, player: playerIdCodec }),
   Codec_.tagged("syncGame", {
     myPlayerName: playerIdCodec,
-    players: C.array(playerIdCodec),
+    players: C.record(playerIdCodec, syncGamePlayerCodec),
   }),
 ]);

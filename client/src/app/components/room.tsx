@@ -59,19 +59,22 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
   if (msg.tag === "syncGame" && model.state.tag === "waiting") {
     const { players, myPlayerName } = msg.data;
 
-    const mockPlayers = players.reduce<Record<PlayerId, Player>>(
-      (acc, playerId) => {
+    const mockPlayers = Object.values(players).reduce<Record<PlayerId, Player>>(
+      (acc, { name, message }) => {
         const MOCK_PLAYER: Player = {
           contactState: undefined,
-          hintState: { tag: "thinking" },
-          id: playerId,
+          hintState:
+            message === ""
+              ? { tag: "thinking" }
+              : { tag: "sharing", word: message },
+          id: name,
           isTyping: false,
-          name: playerId,
+          name,
         };
 
         return {
           ...acc,
-          [playerId]: MOCK_PLAYER,
+          [name]: MOCK_PLAYER,
         };
       },
       {}

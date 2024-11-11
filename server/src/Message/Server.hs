@@ -7,6 +7,7 @@ module Message.Server
     ServerMessage (..),
     SharedHintMessage (..),
     SyncGameMessage (..),
+    SyncGamePlayer (..),
   )
 where
 
@@ -17,6 +18,7 @@ import Data.Aeson
   )
 import qualified Data.Aeson as Aeson
 import Data.Aeson.Casing (camelCase)
+import Data.Map (Map)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 
@@ -71,9 +73,17 @@ data SharedHintMessage = SharedHintMessage
 
 instance ToJSON SharedHintMessage
 
+data SyncGamePlayer = SyncGamePlayer
+  { name :: Text,
+    message :: Text
+  }
+  deriving (Generic, Show)
+
+instance ToJSON SyncGamePlayer
+
 data SyncGameMessage = SyncGameMessage
   { myPlayerName :: Text,
-    players :: [Text]
+    players :: Map Text SyncGamePlayer
   }
   deriving (Generic, Show)
 
