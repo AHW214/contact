@@ -17,6 +17,7 @@ namespace Codec_ {
 export type ClientMessage =
   | { tag: "chooseName"; data: { name: string } }
   | { tag: "contact"; data: { player: PlayerId; word: string } }
+  | { tag: "disconnect" }
   | { tag: "hint"; data: { description: string } };
 
 export type SyncGamePlayer = { name: PlayerId; message: string };
@@ -47,6 +48,7 @@ export type ServerMessage =
 
 export const clientMessageCodec: Codec<ClientMessage> = C.oneOf([
   Codec_.tagged("chooseName", { name: C.string }),
+  Codec.interface({ tag: C.exactly("disconnect") }),
   Codec_.tagged("contact", { player: playerIdCodec, word: C.string }),
   Codec_.tagged("hint", { description: C.string }),
 ]);

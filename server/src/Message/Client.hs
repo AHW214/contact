@@ -25,6 +25,7 @@ import GHC.Generics (Generic, Rep)
 
 data ClientMessage
   = Contact ContactMessage
+  | Disconnect
   | Hint HintMessage
   deriving (Generic, Show)
 

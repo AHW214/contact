@@ -257,6 +257,18 @@ export default function Game({
     return cleanup;
   }, [model.countdown === undefined]);
 
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      sendServer({ tag: "disconnect" });
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+    };
+  }, []);
+
   const { [myPlayerName]: myPlayer, ...restPlayers } = model.players;
 
   const contactingPlayers = Object.values(model.players)

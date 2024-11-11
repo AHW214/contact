@@ -191,6 +191,9 @@ handleMessage server player@Player {playerName} message =
           let msgOut = DeclaredContact (DeclaredContactMessage {fromPlayer = playerName, toPlayer = playerId})
           STM.atomically $ broadcastMessage server msgOut
           pure True
+        Disconnect -> do
+          putStrLn $ "player " <> show playerName <> " disconnected"
+          pure False
         Hint (HintMessage {description}) -> do
           let msgOut = SharedHint (SharedHintMessage {description, player = playerName})
           STM.atomically $ do
