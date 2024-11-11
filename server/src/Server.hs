@@ -189,7 +189,9 @@ handleMessage server player@Player {playerName} message =
       case msg of
         ClearHint -> do
           let msgOut = ClearedHint $ ClearedHintMessage {playerName}
-          STM.atomically $ broadcastMessage server msgOut
+          STM.atomically $ do
+            modifyPlayer server player $ \p -> p {playerMessage = ""}
+            broadcastMessage server msgOut
           pure True
         Contact (ContactMessage {playerId}) -> do
           let msgOut = DeclaredContact $ DeclaredContactMessage {fromPlayer = playerName, toPlayer = playerId}
