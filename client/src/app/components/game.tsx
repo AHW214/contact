@@ -49,6 +49,7 @@ type GameProps = {
 };
 
 const COUNTDOWN_TIME_MILLIS = 5000;
+const COUNTDOWN_TICK_MILLIS = 1000;
 
 const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
   switch (msg.tag) {
@@ -105,7 +106,14 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
     }
 
     case "revealedContact": {
-      const { from, success, to } = msg.data;
+      const {
+        guessedWord,
+        guessingPlayer,
+        hintedWord,
+        hintingPlayer,
+        success,
+      } = msg.data;
+
       const contactStatus = success ? "succeeded" : "failed";
 
       return {
@@ -113,8 +121,8 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
         players: Record.updateManyWithData(
           model.players,
           [
-            [from.player, from.word],
-            [to.player, to.word],
+            [guessingPlayer, guessedWord],
+            [hintingPlayer, hintedWord],
           ],
           (player, word): Player => {
             return {
@@ -278,7 +286,7 @@ export default function Game({
       }
 
       intervalRef.current = window.setInterval(() => {
-        dispatch({ tag: "tickCountdown", millis: 1000 });
+        dispatch({ tag: "tickCountdown", millis: COUNTDOWN_TICK_MILLIS });
       }, 1000);
     } else {
       cleanup();
@@ -302,7 +310,7 @@ export default function Game({
   const { [myPlayerName]: myPlayer, ...restPlayers } = model.players;
 
   const contactingPlayers = Object.values(model.players)
-    .filter(({ contactState }) => contactState !== undefined)
+    .filter(({ contactState }) => contactState?.tag === "declared")
     .slice(0, 2);
 
   const isAnyoneContacting = contactingPlayers.length === 2;

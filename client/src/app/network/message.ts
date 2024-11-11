@@ -39,8 +39,10 @@ export type ServerMessage =
   | {
       tag: "revealedContact";
       data: {
-        from: { player: PlayerId; word: string };
-        to: { player: PlayerId; word: string };
+        guessedWord: string;
+        guessingPlayer: PlayerId;
+        hintedWord: string;
+        hintingPlayer: PlayerId;
         success: boolean;
       };
     }
@@ -75,8 +77,10 @@ export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
   Codec_.tagged("joinedGame", { playerName: playerIdCodec }),
   Codec_.tagged("leftGame", { playerName: playerIdCodec }),
   Codec_.tagged("revealedContact", {
-    from: Codec.interface({ player: playerIdCodec, word: C.string }),
-    to: Codec.interface({ player: playerIdCodec, word: C.string }),
+    guessedWord: C.string,
+    guessingPlayer: playerIdCodec,
+    hintedWord: C.string,
+    hintingPlayer: playerIdCodec,
     success: C.boolean,
   }),
   Codec_.tagged("sharedHint", { description: C.string, player: playerIdCodec }),

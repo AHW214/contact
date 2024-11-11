@@ -34,7 +34,7 @@ instance FromJSON ClientMessage where
   parseJSON = parseTaggedJSON
 
 data ContactMessage = ContactMessage
-  { playerId :: Text,
+  { player :: Text,
     word :: Text
   }
   deriving (Generic, Show)

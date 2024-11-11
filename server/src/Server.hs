@@ -11,7 +11,8 @@ module Server
   )
 where
 
-import Control.Concurrent.Async (race_)
+import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (race_, withAsync)
 import qualified Control.Concurrent.Async as Async
 import Control.Concurrent.STM (STM, TBQueue, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
@@ -193,9 +194,43 @@ handleMessage server player@Player {playerName} message =
             modifyPlayer server player $ \p -> p {playerMessage = ""}
             broadcastMessage server msgOut
           pure True
-        Contact (ContactMessage {playerId}) -> do
-          let msgOut = DeclaredContact $ DeclaredContactMessage {fromPlayer = playerName, toPlayer = playerId}
+        Contact (ContactMessage {player, word}) -> do
+          let msgOut =
+                DeclaredContact $
+                  DeclaredContactMessage
+                    { fromPlayer = playerName,
+                      toPlayer = player
+                    }
+
           STM.atomically $ broadcastMessage server msgOut
+
+          withAsync (threadDelayMillis 1500) $ \async -> do
+            Async.wait async
+
+            STM.atomically $ do
+              players <- readPlayers server
+              let hintedWord =
+                    case Map.lookup player players of
+                      -- TODO
+                      Nothing -> undefined
+                      Just Player {playerMessage} -> playerMessage
+
+                  success =
+                    word == hintedWord
+
+                  -- TODO - name
+                  msgOut2 =
+                    RevealedContact $
+                      RevealedContactMessage
+                        { guessedWord = word,
+                          guessingPlayer = playerName,
+                          hintedWord,
+                          hintingPlayer = player,
+                          success
+                        }
+
+              broadcastMessage server msgOut2
+
           pure True
         Disconnect -> do
           putStrLn $ "player " <> show playerName <> " disconnected"
@@ -287,3 +322,7 @@ messageFromPlayer Player {playerName, playerMessage} =
     { name = playerName,
       message = playerMessage
     }
+
+threadDelayMillis :: Int -> IO ()
+threadDelayMillis millis =
+  threadDelay $ 1000 * millis

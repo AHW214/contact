@@ -5,6 +5,7 @@ module Message.Server
     DeclaredContactMessage (..),
     JoinedGameMessage (..),
     LeftGameMessage (..),
+    RevealedContactMessage (..),
     ServerMessage (..),
     SharedHintMessage (..),
     SyncGameMessage (..),
@@ -28,7 +29,7 @@ data ServerMessage
   | DeclaredContact DeclaredContactMessage
   | JoinedGame JoinedGameMessage
   | LeftGame LeftGameMessage
-  | RevealedContact
+  | RevealedContact RevealedContactMessage
   | SharedHint SharedHintMessage
   | SyncGame SyncGameMessage
   deriving (Generic, Show)
@@ -74,6 +75,17 @@ newtype JoinedGameMessage = JoinedGameMessage
 
 instance ToJSON JoinedGameMessage
 
+data RevealedContactMessage = RevealedContactMessage
+  { guessedWord :: Text,
+    guessingPlayer :: Text,
+    hintedWord :: Text,
+    hintingPlayer :: Text,
+    success :: Bool
+  }
+  deriving (Generic, Show)
+
+instance ToJSON RevealedContactMessage
+
 data SharedHintMessage = SharedHintMessage
   { description :: Text,
     player :: Text
@@ -82,14 +94,6 @@ data SharedHintMessage = SharedHintMessage
 
 instance ToJSON SharedHintMessage
 
-data SyncGamePlayer = SyncGamePlayer
-  { name :: Text,
-    message :: Text
-  }
-  deriving (Generic, Show)
-
-instance ToJSON SyncGamePlayer
-
 data SyncGameMessage = SyncGameMessage
   { myPlayerName :: Text,
     players :: Map Text SyncGamePlayer
@@ -97,3 +101,11 @@ data SyncGameMessage = SyncGameMessage
   deriving (Generic, Show)
 
 instance ToJSON SyncGameMessage
+
+data SyncGamePlayer = SyncGamePlayer
+  { name :: Text,
+    message :: Text
+  }
+  deriving (Generic, Show)
+
+instance ToJSON SyncGamePlayer

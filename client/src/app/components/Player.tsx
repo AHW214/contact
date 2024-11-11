@@ -58,17 +58,17 @@ export default function Player({
               : "border-zinc-300",
           cursor: "auto",
           hoverVisibility:
-            contactState?.tag === "declared" && countdownMillis !== undefined
+            contactState !== undefined && countdownMillis !== undefined
               ? "group-hover:visible"
               : "group-hover:invisible",
           visibility:
-            contactState?.tag === "declared" && countdownMillis !== undefined
+            contactState !== undefined && countdownMillis !== undefined
               ? "visible"
               : "invisible",
         };
 
   const coverText =
-    contactState?.tag === "declared" && countdownMillis !== undefined
+    contactState !== undefined && countdownMillis !== undefined
       ? `${countdownMillis / 1000}`
       : isSelected
       ? "cancel"
@@ -107,7 +107,9 @@ export default function Player({
         >
           <h3>{name}</h3>
         </div>
-        {hintState.tag === "sharing" && hintState.word !== "" ? (
+        {contactState?.tag === "failed" || contactState?.tag === "succeeded" ? (
+          <p className="ml-2">{contactState.word}</p>
+        ) : hintState.tag === "sharing" && hintState.word !== "" ? (
           <p className="ml-2">{hintState.word}</p>
         ) : isTyping ? (
           <p className="ml-2 tracking-widest">...</p>
