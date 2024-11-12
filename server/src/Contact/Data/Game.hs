@@ -2,10 +2,12 @@ module Contact.Data.Game
   ( Contact (..),
     Game (..),
     addPlayer,
+    clearContact,
     getPlayers,
     hasPlayer,
     newGame,
     removePlayer,
+    setContact,
     updatePlayer,
   )
 where
@@ -26,6 +28,14 @@ data Game = Game
   { gameContact :: Maybe Contact,
     gamePlayers :: Map Text Player
   }
+
+clearContact :: Game -> Game
+clearContact game =
+  game {gameContact = Nothing}
+
+setContact :: Game -> Contact -> Game
+setContact game contact =
+  game {gameContact = Just contact}
 
 hasPlayer :: Game -> Text -> Bool
 hasPlayer Game {gamePlayers} name =

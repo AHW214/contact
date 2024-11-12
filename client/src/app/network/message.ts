@@ -34,6 +34,7 @@ export type ServerMessage =
       tag: "declaredContact";
       data: { fromPlayer: PlayerId; toPlayer: PlayerId };
     }
+  | { tag: "endContact" }
   | { tag: "joinedGame"; data: { playerName: PlayerId } }
   | { tag: "leftGame"; data: { playerName: PlayerId } }
   | {
@@ -74,6 +75,7 @@ export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
     fromPlayer: playerIdCodec,
     toPlayer: playerIdCodec,
   }),
+  Codec_.nullary("endContact"),
   Codec_.tagged("joinedGame", { playerName: playerIdCodec }),
   Codec_.tagged("leftGame", { playerName: playerIdCodec }),
   Codec_.tagged("revealedContact", {

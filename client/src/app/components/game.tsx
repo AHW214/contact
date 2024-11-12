@@ -23,7 +23,20 @@ type Action =
   | { tag: "hinting" }
   | { tag: "thinking" };
 
+type Contact = {
+  guessingPlayer: PlayerId;
+  hintingPlayer: PlayerId;
+  result:
+    | {
+        guessingWord: string;
+        hintingWord: string;
+        success: boolean;
+      }
+    | undefined;
+};
+
 type Model = {
+  contact: Contact | undefined;
   countdown: number | undefined;
   currentAction: Action;
   currentInput: string;
@@ -91,6 +104,11 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 
       return {
         ...model,
+        contact: {
+          guessingPlayer: fromPlayer,
+          hintingPlayer: toPlayer,
+          result: undefined,
+        },
         countdown: COUNTDOWN_TIME_MILLIS,
         players: Record.updateMany(
           model.players,
@@ -105,12 +123,31 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
       };
     }
 
+    case "endContact": {
+      if (model.contact === undefined) {
+        // TODO - handle error case
+        return model;
+      }
+
+      return {
+        ...model,
+        contact: undefined,
+      };
+    }
+
     case "revealedContact": {
+      if (model.contact === undefined) {
+        // TODO - handle error case
+        return model;
+      }
+
+      const { guessingPlayer, hintingPlayer } = model.contact;
+
+      // TODO - can remove above Player fields from message
+      // TODO - make message field names consistent
       const {
-        guessedWord,
-        guessingPlayer,
-        hintedWord,
-        hintingPlayer,
+        guessedWord: guessingWord,
+        hintedWord: hintingWord,
         success,
       } = msg.data;
 
@@ -118,11 +155,15 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 
       return {
         ...model,
+        contact: {
+          ...model.contact,
+          result: { guessingWord, hintingWord, success },
+        },
         players: Record.updateManyWithData(
           model.players,
           [
-            [guessingPlayer, guessedWord],
-            [hintingPlayer, hintedWord],
+            [guessingPlayer, guessingWord],
+            [hintingPlayer, hintingWord],
           ],
           (player, word): Player => {
             return {
@@ -235,6 +276,7 @@ export default function Game({
   const intervalRef: MutableRefObject<number | undefined> = useRef(undefined);
 
   const initModel: Model = {
+    contact: undefined,
     countdown: undefined,
     currentAction: { tag: "thinking" },
     currentInput: "",
@@ -309,11 +351,7 @@ export default function Game({
 
   const { [myPlayerName]: myPlayer, ...restPlayers } = model.players;
 
-  const contactingPlayers = Object.values(model.players)
-    .filter(({ contactState }) => contactState?.tag === "declared")
-    .slice(0, 2);
-
-  const isAnyoneContacting = contactingPlayers.length === 2;
+  const isAnyoneContacting = model.contact !== undefined;
 
   if (myPlayer === undefined) {
     return <div>no player???</div>;
@@ -342,8 +380,8 @@ export default function Game({
       </div>
       <div className="flex flex-col gap-1">
         <h3 className="text-zinc-400 text-sm">
-          {isAnyoneContacting
-            ? `${contactingPlayers[0].name} and ${contactingPlayers[1].name} are about to contact`
+          {model.contact !== undefined
+            ? `${model.contact.guessingPlayer} and ${model.contact.hintingPlayer} are about to contact`
             : model.currentInput === ""
             ? "words, words, words..."
             : model.currentAction.tag === "contact"

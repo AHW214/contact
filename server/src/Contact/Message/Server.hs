@@ -27,6 +27,7 @@ import GHC.Generics (Generic)
 data ServerMessage
   = ClearedHint ClearedHintMessage
   | DeclaredContact DeclaredContactMessage
+  | EndContact
   | JoinedGame JoinedGameMessage
   | LeftGame LeftGameMessage
   | RevealedContact RevealedContactMessage

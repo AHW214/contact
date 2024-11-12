@@ -10,7 +10,16 @@ module Contact.Server
   )
 where
 
-import Contact.Data.Game (Game (..), newGame)
+import Contact.Data.Game
+  ( Contact
+      ( contactGuessingPlayer,
+        contactGuessingWord,
+        contactHintingPlayer,
+        contactHintingWord
+      ),
+    Game (..),
+    newGame,
+  )
 import qualified Contact.Data.Game as Game
 import Contact.Data.Player (Event (..), Player (..), newPlayer)
 import qualified Contact.Data.Player as Player
@@ -180,42 +189,57 @@ handleMessage server player@Player {playerName} message =
             modifyPlayer server player $ \p -> p {playerMessage = ""}
             broadcastMessage server msgOut
           pure True
-        Contact (ContactMessage {player, word}) -> do
-          let msgOut =
-                DeclaredContact $
-                  DeclaredContactMessage
-                    { fromPlayer = playerName,
-                      toPlayer = player
-                    }
+        Contact (ContactMessage {player = hintingPlayer, word = guessingWord}) -> do
+          maybeHintingWord <- STM.atomically $ do
+            Game {gamePlayers} <- readGame server
+            pure (playerMessage <$> Map.lookup hintingPlayer gamePlayers)
 
-          STM.atomically $ broadcastMessage server msgOut
-
-          withAsync (threadDelayMillis 4500) $ \async -> do
-            Async.wait async
-
-            STM.atomically $ do
-              Game {gamePlayers} <- readGame server
-              let hintedWord =
-                    case Map.lookup player gamePlayers of
-                      -- TODO
-                      Nothing -> undefined
-                      Just Player {playerMessage} -> playerMessage
-
-                  success =
-                    word == hintedWord
-
-                  -- TODO - name
-                  msgOut2 =
-                    RevealedContact $
-                      RevealedContactMessage
-                        { guessedWord = word,
-                          guessingPlayer = playerName,
-                          hintedWord,
-                          hintingPlayer = player,
-                          success
+          case maybeHintingWord of
+            Nothing ->
+              -- TODO - send error message to client?
+              pure ()
+            Just hintingWord -> do
+              STM.atomically $ do
+                let contact =
+                      Game.Contact
+                        { contactGuessingPlayer = playerName,
+                          contactGuessingWord = guessingWord,
+                          contactHintingPlayer = hintingPlayer,
+                          contactHintingWord = hintingWord
                         }
 
-              broadcastMessage server msgOut2
+                modifyGame server $ \game -> Game.setContact game contact
+
+                let msgOut =
+                      DeclaredContact $
+                        DeclaredContactMessage
+                          { fromPlayer = playerName,
+                            toPlayer = hintingPlayer
+                          }
+
+                broadcastMessage server msgOut
+
+              runAfterDelay 4500 $ do
+                STM.atomically $ do
+                  let success =
+                        guessingWord == hintingWord
+
+                      msgOut =
+                        RevealedContact $
+                          RevealedContactMessage
+                            { guessedWord = guessingWord,
+                              guessingPlayer = playerName,
+                              hintedWord = hintingWord,
+                              hintingPlayer,
+                              success
+                            }
+
+                  broadcastMessage server msgOut
+
+                runAfterDelay 3000 $
+                  STM.atomically $ do
+                    modifyGame server Game.clearContact
+                    broadcastMessage server EndContact
 
           pure True
         Disconnect -> do
@@ -243,8 +267,12 @@ readGame =
   STM.readTVar . serverGame
 
 modifyPlayer :: Server -> Player -> (Player -> Player) -> STM ()
-modifyPlayer Server {serverGame} player withPlayer =
-  STM.modifyTVar' serverGame $ \game -> Game.updatePlayer game player withPlayer
+modifyPlayer server player withPlayer =
+  modifyGame server $ \game -> Game.updatePlayer game player withPlayer
+
+modifyGame :: Server -> (Game -> Game) -> STM ()
+modifyGame Server {serverGame} =
+  STM.modifyTVar' serverGame
 
 removeFromLobby :: Server -> UUID -> IO ()
 removeFromLobby Server {serverLobby} sessionId = STM.atomically $ do
@@ -283,6 +311,8 @@ messageFromPlayer Player {playerName, playerMessage} =
       message = playerMessage
     }
 
-threadDelayMillis :: Int -> IO ()
-threadDelayMillis millis =
-  threadDelay $ 1000 * millis
+runAfterDelay :: Int -> IO () -> IO ()
+runAfterDelay millis action =
+  withAsync (threadDelay $ 1000 * millis) $ \async -> do
+    Async.wait async
+    action
