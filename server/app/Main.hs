@@ -1,12 +1,12 @@
 module Main (main) where
 
+import Contact.Server (mkHttpApp, mkWsApp, newServer)
 import qualified Control.Concurrent.STM as STM
 import Data.Function ((&))
 import Network.Wai.Handler.Warp (Port, setBeforeMainLoop, setPort)
 import qualified Network.Wai.Handler.Warp as Warp
 import Network.Wai.Handler.WebSockets (websocketsOr)
 import qualified Network.WebSockets as WS
-import Server (mkHttpApp, mkWsApp, newServer)
 
 main :: IO ()
 main = do

@@ -1,7 +1,7 @@
 {-# LANGUAGE DisambiguateRecordFields #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Server
+module Contact.Server
   ( Message (..),
     Player (..),
     Server (..),

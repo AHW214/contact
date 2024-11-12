@@ -1,4 +1,4 @@
-module Data.Game
+module Contact.Data.Game
   (
   )
 where
