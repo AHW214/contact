@@ -2,8 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 
 module Contact.Server
-  ( Message (..),
-    Player (..),
+  ( Player (..),
     Server (..),
     mkHttpApp,
     mkWsApp,
@@ -11,19 +10,22 @@ module Contact.Server
   )
 where
 
+import Contact.Data.Game (Game (..), newGame)
+import qualified Contact.Data.Game as Game
+import Contact.Data.Player (Event (..), Player (..), newPlayer)
+import qualified Contact.Data.Player as Player
 import Contact.Message.Client
 import Contact.Message.Server
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (race_, withAsync)
 import qualified Control.Concurrent.Async as Async
-import Control.Concurrent.STM (STM, TBQueue, TChan, TVar)
+import Control.Concurrent.STM (STM, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
 import Control.Exception (catch, finally, throwIO)
 import Control.Monad (forever, join, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (ToJSON)
 import qualified Data.Aeson as Aeson
-import Data.ByteString (ByteString)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -32,30 +34,14 @@ import qualified Data.UUID.V4 as UUID
 import GHC.Generics (Generic)
 import qualified Network.Wai as Wai
 import qualified Network.WebSockets as WS
-import Numeric.Natural (Natural)
 import Web.Scotty (get, scottyApp)
 import qualified Web.Scotty as Scotty
 
-data Player = Player
-  { -- TODO - different message type just for broadcasts
-    -- TODO - !! broadcast chan is unbounded !!
-    playerBroadcastChanOut :: TChan ServerMessage,
-    playerConnection :: WS.Connection,
-    playerMessage :: Text,
-    playerName :: Text,
-    playerSendQueue :: TBQueue Message
-  }
-
 data Server = Server
   { serverBroadcastChanIn :: TChan ServerMessage,
-    serverGame :: TVar (Map Text Player),
+    serverGame :: TVar Game,
     serverLobby :: TVar (Map UUID WS.Connection)
   }
-
-data Message
-  = Broadcast ServerMessage
-  | Inbound ClientMessage
-  | Sync
 
 newtype RoomResponse = RoomResponse
   { players :: [Text]
@@ -65,14 +51,14 @@ newtype RoomResponse = RoomResponse
 instance ToJSON RoomResponse
 
 mkHttpApp :: Server -> IO Wai.Application
-mkHttpApp Server {serverGame} = scottyApp $ do
+mkHttpApp server = scottyApp $ do
   get "/room/:roomId" $ do
     -- TODO - use when rooms are implemented server-side
     -- roomId <- Scotty.queryParam "roomId"
 
     players <- liftIO $ STM.atomically $ do
-      game <- STM.readTVar serverGame
-      pure $ Map.keys game
+      Game {gamePlayers} <- readGame server
+      pure $ Map.keys gamePlayers
 
     liftIO $ putStrLn $ "current players: " <> show players
 
@@ -106,7 +92,7 @@ handleConnection server@Server {serverBroadcastChanIn, serverGame, serverLobby} 
 
         handlePlayer server player `finally` do
           putStrLn $ "removing player " <> show playerName
-          removeFromGame server playerName
+          removeFromGame server player
   where
     waitForPlayerName :: IO Player
     waitForPlayerName = do
@@ -118,12 +104,12 @@ handleConnection server@Server {serverBroadcastChanIn, serverGame, serverLobby} 
           waitForPlayerName
         Right (ChooseName ChooseNameMessage {name}) -> do
           join $ STM.atomically $ do
-            players <- STM.readTVar serverGame
-            if Map.member name players
+            game <- readGame server
+            if Game.hasPlayer game name
               then pure waitForPlayerName
               else do
                 player <- newPlayer serverBroadcastChanIn conn name
-                STM.writeTVar serverGame $ Map.insert name player players
+                STM.writeTVar serverGame $ Game.addPlayer game player
                 pure $ pure player
 
     broadcast :: TChan ServerMessage -> IO ()
@@ -145,20 +131,20 @@ handleConnection server@Server {serverBroadcastChanIn, serverGame, serverLobby} 
     pingMillis = 30
 
 handlePlayer :: Server -> Player -> IO ()
-handlePlayer server player@Player {playerBroadcastChanOut, playerName, playerSendQueue} = do
-  STM.atomically $ sendMessage player Sync
+handlePlayer server player@Player {playerName} = do
+  STM.atomically $ Player.dispatchEvent player Sync
   -- TODO: racing multiple threads this way seems jank
   receive `race_` serve `race_` broadcast
   pure ()
   where
     receive :: IO ()
     receive = forever $ do
-      msg <- receiveMessage player `catch` onDisconnect
+      msg <- Player.receiveWebSocket player `catch` onDisconnect
       case Aeson.eitherDecodeStrict msg of
         Left err ->
           putStrLn $ "could not decode client message: " <> err
         Right clientMessage ->
-          STM.atomically $ sendMessage player $ Inbound clientMessage
+          STM.atomically $ Player.dispatchEvent player $ Inbound clientMessage
 
     onDisconnect :: WS.ConnectionException -> IO a
     onDisconnect ex = do
@@ -167,7 +153,7 @@ handlePlayer server player@Player {playerBroadcastChanOut, playerName, playerSen
 
     serve :: IO ()
     serve = join $ STM.atomically $ do
-      msg <- STM.readTBQueue playerSendQueue
+      msg <- Player.receiveEvent player
       pure $ do
         continue <- handleMessage server player msg
         when continue serve
@@ -175,14 +161,14 @@ handlePlayer server player@Player {playerBroadcastChanOut, playerName, playerSen
     broadcast :: IO ()
     broadcast = forever $
       STM.atomically $ do
-        msg <- STM.readTChan playerBroadcastChanOut
-        sendMessage player $ Broadcast msg
+        msg <- Player.receiveBroadcast player
+        Player.dispatchEvent player $ Broadcast msg
 
-handleMessage :: Server -> Player -> Message -> IO Bool
+handleMessage :: Server -> Player -> Event -> IO Bool
 handleMessage server player@Player {playerName} message =
   case message of
     Broadcast msg -> do
-      sendPlayerWS player msg
+      Player.sendWebSocket player msg
       pure True
     Inbound msg -> do
       putStrLn $ "received message: " <> show msg
@@ -204,13 +190,13 @@ handleMessage server player@Player {playerName} message =
 
           STM.atomically $ broadcastMessage server msgOut
 
-          withAsync (threadDelayMillis 1500) $ \async -> do
+          withAsync (threadDelayMillis 4500) $ \async -> do
             Async.wait async
 
             STM.atomically $ do
-              players <- readPlayers server
+              Game {gamePlayers} <- readGame server
               let hintedWord =
-                    case Map.lookup player players of
+                    case Map.lookup player gamePlayers of
                       -- TODO
                       Nothing -> undefined
                       Just Player {playerMessage} -> playerMessage
@@ -242,36 +228,38 @@ handleMessage server player@Player {playerName} message =
             broadcastMessage server msgOut
           pure True
     Sync -> do
-      players <- STM.atomically $ readPlayers server
-      let syncGameMsg = messageFromGame players playerName
+      Game {gamePlayers} <- STM.atomically $ readGame server
+      let syncGameMsg = messageFromGame gamePlayers playerName
 
-      sendPlayerWS player $ SyncGame syncGameMsg
+      Player.sendWebSocket player $ SyncGame syncGameMsg
       pure True
 
 broadcastMessage :: Server -> ServerMessage -> STM ()
 broadcastMessage =
   STM.writeTChan . serverBroadcastChanIn
 
-readPlayers :: Server -> STM (Map Text Player)
-readPlayers Server {serverGame} =
-  STM.readTVar serverGame
+readGame :: Server -> STM Game
+readGame =
+  STM.readTVar . serverGame
 
 modifyPlayer :: Server -> Player -> (Player -> Player) -> STM ()
-modifyPlayer Server {serverGame} Player {playerName} withPlayer =
-  STM.modifyTVar' serverGame $ Map.adjust withPlayer playerName
+modifyPlayer Server {serverGame} player withPlayer =
+  STM.modifyTVar' serverGame $ \game -> Game.updatePlayer game player withPlayer
 
 removeFromLobby :: Server -> UUID -> IO ()
 removeFromLobby Server {serverLobby} sessionId = STM.atomically $ do
   STM.modifyTVar' serverLobby $ Map.delete sessionId
 
-removeFromGame :: Server -> Text -> IO ()
-removeFromGame Server {serverBroadcastChanIn, serverGame} playerName = STM.atomically $ do
-  STM.modifyTVar' serverGame $ Map.delete playerName
-  STM.writeTChan serverBroadcastChanIn $ LeftGame LeftGameMessage {playerName}
+removeFromGame :: Server -> Player -> IO ()
+removeFromGame
+  Server {serverBroadcastChanIn, serverGame}
+  player@Player {playerName} = STM.atomically $ do
+    STM.modifyTVar' serverGame $ \game -> Game.removePlayer game player
+    STM.writeTChan serverBroadcastChanIn $ LeftGame LeftGameMessage {playerName}
 
 newServer :: TChan ServerMessage -> IO Server
 newServer broadcastChanIn = do
-  game <- STM.newTVarIO Map.empty
+  game <- STM.newTVarIO newGame
   lobby <- STM.newTVarIO Map.empty
 
   pure
@@ -280,34 +268,6 @@ newServer broadcastChanIn = do
         serverGame = game,
         serverLobby = lobby
       }
-
-playerSendQueueCapacity :: Natural
-playerSendQueueCapacity = 128
-
-newPlayer :: TChan ServerMessage -> WS.Connection -> Text -> STM Player
-newPlayer broadcastChanIn conn name = do
-  broadCastChanOut <- STM.dupTChan broadcastChanIn
-  sendQueue <- STM.newTBQueue playerSendQueueCapacity
-  pure
-    Player
-      { playerBroadcastChanOut = broadCastChanOut,
-        playerConnection = conn,
-        playerMessage = "",
-        playerName = name,
-        playerSendQueue = sendQueue
-      }
-
-sendPlayerWS :: Player -> ServerMessage -> IO ()
-sendPlayerWS Player {playerConnection} =
-  WS.sendTextData playerConnection . Aeson.encode
-
-receiveMessage :: Player -> IO ByteString
-receiveMessage =
-  WS.receiveData . playerConnection
-
-sendMessage :: Player -> Message -> STM ()
-sendMessage =
-  STM.writeTBQueue . playerSendQueue
 
 messageFromGame :: Map Text Player -> Text -> SyncGameMessage
 messageFromGame players myPlayerName =

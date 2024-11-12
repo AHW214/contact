@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Contact.Data.Game
+      Contact.Data.Player
       Contact.Message.Client
       Contact.Message.Server
       Contact.Server
