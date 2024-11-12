@@ -11,6 +11,8 @@ module Server
   )
 where
 
+import Contact.Message.Client
+import Contact.Message.Server
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (race_, withAsync)
 import qualified Control.Concurrent.Async as Async
@@ -28,8 +30,6 @@ import Data.Text (Text)
 import Data.UUID (UUID)
 import qualified Data.UUID.V4 as UUID
 import GHC.Generics (Generic)
-import Message.Client
-import Message.Server
 import qualified Network.Wai as Wai
 import qualified Network.WebSockets as WS
 import Numeric.Natural (Natural)

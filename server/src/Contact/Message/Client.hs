@@ -1,6 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-module Message.Client
+module Contact.Message.Client
   ( ChooseNameMessage (..),
     ClientMessage (..),
     ContactMessage (..),

@@ -1,6 +1,6 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 
-module Message.Server
+module Contact.Message.Server
   ( ClearedHintMessage (..),
     DeclaredContactMessage (..),
     JoinedGameMessage (..),

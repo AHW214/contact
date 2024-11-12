@@ -25,9 +25,10 @@ source-repository head
 
 library
   exposed-modules:
-      Message.Client
-      Message.Server
-      Server
+      Contact.Data.Game
+      Contact.Message.Client
+      Contact.Message.Server
+      Contact.Server
   other-modules:
       Paths_contact_server
   autogen-modules:
