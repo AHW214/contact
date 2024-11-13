@@ -8,20 +8,15 @@ import {
   useRef,
 } from "react";
 
-import Input from "contact/app/components/input";
+import PlayerInput from "contact/app/components/player-input";
 import PlayerView, { type ContactState } from "contact/app/components/player";
 import WordDisplay, {
   type TargetWord,
 } from "contact/app/components/word-display";
 import Wordmaster from "contact/app/components/wordmaster";
-import type { Player, PlayerId } from "contact/app/data/player";
+import type { Player, PlayerAction, PlayerId } from "contact/app/data/player";
 import type { ClientMessage, ServerMessage } from "contact/app/network/message";
 import * as Record from "contact/app/util/record";
-
-type Action =
-  | { tag: "contact"; player: { id: PlayerId; name: string } }
-  | { tag: "hinting" }
-  | { tag: "thinking" };
 
 type Contact = {
   guessingPlayer: PlayerId;
@@ -38,7 +33,7 @@ type Contact = {
 type Model = {
   contact: Contact | undefined;
   countdown: number | undefined;
-  currentAction: Action;
+  currentAction: PlayerAction;
   currentInput: string;
   myPlayerName: PlayerId;
   players: Record<PlayerId, Player>;
@@ -400,20 +395,11 @@ export default function Game({
             ? "press escape to stop sharing your hint"
             : "press enter to share your hint with everyone"}
         </h3>
-        <Input
-          className={`${
-            model.currentAction.tag === "hinting" && !isAnyoneContacting
-              ? "font-bold caret-transparent border-zinc-800"
-              : "font-normal caret-inherit border-inherit"
-          } ${
-            myPlayer.contactState === undefined
-              ? "border-zinc-300"
-              : myPlayer.contactState.tag === "declared"
-              ? "border-blue-800"
-              : myPlayer.contactState.tag === "failed"
-              ? "border-red-800"
-              : "border-green-800"
-          } ${isAnyoneContacting ? "cursor-not-allowed" : "cursor-auto"}`}
+        <PlayerInput
+          // TODO - own player represented by model, how to pass here
+          contactState={playerContactState(model, undefined)}
+          currentAction={model.currentAction}
+          isAnyoneContacting={isAnyoneContacting}
           ref={inputRef}
           onChange={(ev) => {
             if (model.currentAction.tag !== "hinting") {
@@ -440,15 +426,6 @@ export default function Game({
               });
             }
           }}
-          placeholder={
-            isAnyoneContacting
-              ? "...suspense..."
-              : model.currentAction.tag === "contact"
-              ? "type your guess here..."
-              : "type your hint here..."
-          }
-          value={isAnyoneContacting ? "" : model.currentInput}
-          disabled={isAnyoneContacting}
         />
       </div>
     </div>

@@ -6,6 +6,11 @@ export type PlayerId = WithBrand<string, "Player">;
 
 export type HintState = { tag: "sharing"; word: string } | { tag: "thinking" };
 
+export type PlayerAction =
+  | { tag: "contact"; player: { id: PlayerId; name: string } }
+  | { tag: "hinting" }
+  | { tag: "thinking" };
+
 export type Player = {
   hintState: HintState;
   id: PlayerId;

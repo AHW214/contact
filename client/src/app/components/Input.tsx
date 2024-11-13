@@ -5,12 +5,12 @@ import {
   forwardRef,
 } from "react";
 
-export interface Props extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   onChange: ChangeEventHandler<HTMLInputElement>;
   onEnter: KeyboardEventHandler<HTMLInputElement>;
 }
 
-const Input = forwardRef<HTMLInputElement, Props>(
+const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ onChange, onEnter, ...props }, ref) => {
     const onKeyDown: KeyboardEventHandler<HTMLInputElement> = (ev) => {
       if (ev.key === "Enter") {
