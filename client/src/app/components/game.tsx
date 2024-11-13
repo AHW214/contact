@@ -9,7 +9,7 @@ import {
 } from "react";
 
 import Input from "contact/app/components/input";
-import PlayerView from "contact/app/components/player";
+import PlayerView, { type ContactState } from "contact/app/components/player";
 import WordDisplay, {
   type TargetWord,
 } from "contact/app/components/word-display";
@@ -110,16 +110,6 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
           result: undefined,
         },
         countdown: COUNTDOWN_TIME_MILLIS,
-        players: Record.updateMany(
-          model.players,
-          [fromPlayer, toPlayer],
-          (player): Player => {
-            return {
-              ...player,
-              contactState: { tag: "declared" },
-            };
-          }
-        ),
       };
     }
 
@@ -159,19 +149,6 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
           ...model.contact,
           result: { guessingWord, hintingWord, success },
         },
-        players: Record.updateManyWithData(
-          model.players,
-          [
-            [guessingPlayer, guessingWord],
-            [hintingPlayer, hintingWord],
-          ],
-          (player, word): Player => {
-            return {
-              ...player,
-              contactState: { tag: contactStatus, word },
-            };
-          }
-        ),
       };
     }
 
@@ -179,7 +156,6 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
       const { playerName } = msg.data;
 
       const MOCK_PLAYER: Player = {
-        contactState: undefined,
         hintState: { tag: "thinking" },
         id: playerName,
         isTyping: false,
@@ -257,6 +233,39 @@ const update = (model: Model, msg: Msg): Model => {
     default:
       return model;
   }
+};
+
+const playerContactState = (
+  model: Model,
+  player: Player
+): ContactState | undefined => {
+  if (model.contact === undefined) {
+    return undefined;
+  }
+
+  const { guessingPlayer, hintingPlayer, result } = model.contact;
+
+  const isGuessing = player.name === guessingPlayer;
+  const isHinting = player.name === hintingPlayer;
+  const isContacting = isGuessing || isHinting;
+
+  if (!isContacting) {
+    return undefined;
+  }
+
+  if (result === undefined) {
+    return {
+      tag: "declared",
+    };
+  }
+
+  const { guessingWord, hintingWord, success } = result;
+
+  return {
+    tag: "revealed",
+    success,
+    word: isGuessing ? guessingWord : hintingWord,
+  };
 };
 
 export default function Game({
@@ -366,6 +375,7 @@ export default function Game({
           <PlayerView
             key={player.id}
             inputRef={inputRef}
+            contactState={playerContactState(model, player)}
             countdownMillis={model.countdown}
             onClickCancel={() => dispatch({ tag: "clickedCancel" })}
             onClickContact={() =>

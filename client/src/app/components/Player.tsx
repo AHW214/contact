@@ -2,7 +2,12 @@
 
 import { type MouseEventHandler, type RefObject, useState } from "react";
 
-import type { ContactState, HintState } from "contact/app/data/player";
+import type { HintState } from "contact/app/data/player";
+
+// TODO - merge with HintState
+export type ContactState =
+  | { tag: "declared" }
+  | { tag: "revealed"; success: boolean; word: string };
 
 export type Props = {
   contactState: ContactState | undefined;
@@ -28,34 +33,28 @@ export default function Player({
   onClickContact,
 }: Props) {
   const [isSelected, setIsSelected] = useState<boolean>(false);
+  const borderColor =
+    contactState === undefined
+      ? isSelected
+        ? "border-zinc-800"
+        : "border-zinc-300"
+      : contactState.tag === "declared"
+      ? "border-blue-800"
+      : contactState.success
+      ? "border-green-800"
+      : "border-red-800";
 
   // TODO - clean up
   const classes =
     hintState.tag === "sharing" && hintState.word !== ""
       ? {
-          borderColor:
-            contactState?.tag === "failed"
-              ? "border-red-800"
-              : contactState?.tag === "succeeded"
-              ? "border-green-800"
-              : contactState?.tag === "declared"
-              ? "border-blue-800"
-              : isSelected
-              ? "border-zinc-800"
-              : "border-zinc-300",
+          borderColor,
           cursor: "cursor-pointer",
           hoverVisibility: "group-hover:visible",
           visibility: "invisible",
         }
       : {
-          borderColor:
-            contactState?.tag === "failed"
-              ? "border-red-800"
-              : contactState?.tag === "succeeded"
-              ? "border-green-800"
-              : contactState?.tag === "declared"
-              ? "border-blue-800"
-              : "border-zinc-300",
+          borderColor,
           cursor: "auto",
           hoverVisibility:
             contactState !== undefined && countdownMillis !== undefined
@@ -107,7 +106,7 @@ export default function Player({
         >
           <h3>{name}</h3>
         </div>
-        {contactState?.tag === "failed" || contactState?.tag === "succeeded" ? (
+        {contactState !== undefined && contactState.tag === "revealed" ? (
           <p className="ml-2">{contactState.word}</p>
         ) : hintState.tag === "sharing" && hintState.word !== "" ? (
           <p className="ml-2">{hintState.word}</p>
