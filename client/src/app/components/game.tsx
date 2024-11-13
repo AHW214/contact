@@ -232,7 +232,7 @@ const update = (model: Model, msg: Msg): Model => {
 
 const playerContactState = (
   model: Model,
-  player: Player
+  player: PlayerId
 ): ContactState | undefined => {
   if (model.contact === undefined) {
     return undefined;
@@ -240,8 +240,8 @@ const playerContactState = (
 
   const { guessingPlayer, hintingPlayer, result } = model.contact;
 
-  const isGuessing = player.name === guessingPlayer;
-  const isHinting = player.name === hintingPlayer;
+  const isGuessing = player === guessingPlayer;
+  const isHinting = player === hintingPlayer;
   const isContacting = isGuessing || isHinting;
 
   if (!isContacting) {
@@ -370,7 +370,7 @@ export default function Game({
           <PlayerView
             key={player.id}
             inputRef={inputRef}
-            contactState={playerContactState(model, player)}
+            contactState={playerContactState(model, player.id)}
             countdownMillis={model.countdown}
             onClickCancel={() => dispatch({ tag: "clickedCancel" })}
             onClickContact={() =>
@@ -396,8 +396,7 @@ export default function Game({
             : "press enter to share your hint with everyone"}
         </h3>
         <PlayerInput
-          // TODO - own player represented by model, how to pass here
-          contactState={playerContactState(model, undefined)}
+          contactState={playerContactState(model, model.myPlayerName)}
           currentAction={model.currentAction}
           isAnyoneContacting={isAnyoneContacting}
           ref={inputRef}
@@ -426,6 +425,7 @@ export default function Game({
               });
             }
           }}
+          value={model.currentInput}
         />
       </div>
     </div>

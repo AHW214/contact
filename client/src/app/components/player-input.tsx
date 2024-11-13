@@ -10,6 +10,7 @@ export interface PlayerInputProps extends InputProps {
   currentAction: PlayerAction;
   isAnyoneContacting: boolean;
   ref: Ref<HTMLInputElement>;
+  value: string;
 }
 
 const PlayerInput = ({
