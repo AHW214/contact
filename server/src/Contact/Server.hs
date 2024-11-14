@@ -26,12 +26,12 @@ import qualified Contact.Data.Player as Player
 import Contact.Message.Client
 import Contact.Message.Server
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.Async (race_, withAsync)
+import Control.Concurrent.Async (async, race_)
 import qualified Control.Concurrent.Async as Async
 import Control.Concurrent.STM (STM, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
 import Control.Exception (catch, finally, throwIO)
-import Control.Monad (forever, join, when)
+import Control.Monad (forever, join, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (ToJSON)
 import qualified Data.Aeson as Aeson
@@ -313,6 +313,7 @@ messageFromPlayer Player {playerName, playerMessage} =
 
 runAfterDelay :: Int -> IO () -> IO ()
 runAfterDelay millis action =
-  withAsync (threadDelay $ 1000 * millis) $ \async -> do
-    Async.wait async
+  -- TODO - possible to write this using Async.withAsync ?
+  void $ async $ do
+    threadDelay $ 1000 * millis
     action
