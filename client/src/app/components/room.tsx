@@ -62,7 +62,6 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
     const mockPlayers = Object.values(players).reduce<Record<PlayerId, Player>>(
       (acc, { name, message }) => {
         const MOCK_PLAYER: Player = {
-          contactState: undefined,
           hintState:
             message === ""
               ? { tag: "thinking" }
@@ -125,6 +124,7 @@ export default function Room({
   };
 
   const lastServerMessage: ServerMessage | undefined = useMemo(() => {
+    // TODO - running twice per message??
     return lastMessage ? parseWebSocketData(lastMessage.data) : undefined;
   }, [lastMessage]);
 
