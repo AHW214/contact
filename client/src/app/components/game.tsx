@@ -398,6 +398,9 @@ export default function Game({
         <PlayerInput
           contactState={playerContactState(model, model.myPlayerName)}
           currentAction={model.currentAction}
+          hideContactResult={
+            model.countdown !== undefined && model.countdown > 0
+          }
           isAnyoneContacting={isAnyoneContacting}
           ref={inputRef}
           onChange={(ev) => {

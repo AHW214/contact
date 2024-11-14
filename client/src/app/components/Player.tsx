@@ -46,24 +46,21 @@ export default function Player({
 
   // TODO - clean up
   const classes =
-    hintState.tag === "sharing" && hintState.word !== ""
+    contactState !== undefined
       ? {
+          borderColor,
+          cursor: "auto",
+          hoverVisibility:
+            countdownMillis !== undefined
+              ? "group-hover:visible"
+              : "group-hover:invisible",
+          visibility: countdownMillis !== undefined ? "visible" : "invisible",
+        }
+      : {
           borderColor,
           cursor: "cursor-pointer",
           hoverVisibility: "group-hover:visible",
           visibility: "invisible",
-        }
-      : {
-          borderColor,
-          cursor: "auto",
-          hoverVisibility:
-            contactState !== undefined && countdownMillis !== undefined
-              ? "group-hover:visible"
-              : "group-hover:invisible",
-          visibility:
-            contactState !== undefined && countdownMillis !== undefined
-              ? "visible"
-              : "invisible",
         };
 
   const coverText =
