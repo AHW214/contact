@@ -26,7 +26,7 @@ import qualified Contact.Data.Player as Player
 import Contact.Message.Client
 import Contact.Message.Server
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.Async (async, race_)
+import Control.Concurrent.Async (Concurrently (..), async)
 import qualified Control.Concurrent.Async as Async
 import Control.Concurrent.STM (STM, TChan, TVar)
 import qualified Control.Concurrent.STM as STM
@@ -35,6 +35,7 @@ import Control.Monad (forever, join, void, when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (ToJSON)
 import qualified Data.Aeson as Aeson
+import Data.Foldable (asum)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -142,9 +143,7 @@ handleConnection server@Server {serverBroadcastChanIn, serverGame, serverLobby} 
 handlePlayer :: Server -> Player -> IO ()
 handlePlayer server player@Player {playerName} = do
   STM.atomically $ Player.dispatchEvent player Sync
-  -- TODO: racing multiple threads this way seems jank
-  receive `race_` serve `race_` broadcast
-  pure ()
+  raceAll [receive, serve, broadcast]
   where
     receive :: IO ()
     receive = forever $ do
@@ -317,3 +316,7 @@ runAfterDelay millis action =
   void $ async $ do
     threadDelay $ 1000 * millis
     action
+
+-- https://stackoverflow.com/a/66591096
+raceAll :: [IO a] -> IO a
+raceAll = runConcurrently . asum . fmap Concurrently
