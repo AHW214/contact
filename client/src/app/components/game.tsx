@@ -42,7 +42,7 @@ type Model = {
 type Msg =
   | { tag: "changedInput"; value: string }
   | { tag: "clickedCancel" }
-  | { tag: "clickedContact"; player: { id: PlayerId; name: string } }
+  | { tag: "clickedContact"; player: PlayerId }
   | { tag: "clickedEscape" }
   | { tag: "sharedHint" }
   | { tag: "tickCountdown"; millis: number }
@@ -152,7 +152,6 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 
       const MOCK_PLAYER: Player = {
         hintState: { tag: "thinking" },
-        id: playerName,
         isTyping: false,
         name: playerName,
       };
@@ -368,18 +367,19 @@ export default function Game({
       <div className="flex gap-2">
         {Object.values(restPlayers).map((player) => (
           <PlayerView
-            key={player.id}
-            inputRef={inputRef}
-            contactState={playerContactState(model, player.id)}
             countdownMillis={model.countdown}
+            inputRef={inputRef}
+            isTyping={player.isTyping}
+            key={player.name}
+            name={player.name}
             onClickCancel={() => dispatch({ tag: "clickedCancel" })}
             onClickContact={() =>
               dispatch({
                 tag: "clickedContact",
-                player,
+                player: player.name,
               })
             }
-            {...player}
+            state={playerContactState(model, player.name) ?? player.hintState}
           />
         ))}
       </div>
@@ -390,7 +390,7 @@ export default function Game({
             : model.currentInput === ""
             ? "words, words, words..."
             : model.currentAction.tag === "contact"
-            ? `press enter to contact with ${model.currentAction.player.name}`
+            ? `press enter to contact with ${model.currentAction.player}`
             : model.currentAction.tag === "hinting"
             ? "press escape to stop sharing your hint"
             : "press enter to share your hint with everyone"}
@@ -413,7 +413,7 @@ export default function Game({
               sendServer({
                 tag: "contact",
                 data: {
-                  player: model.currentAction.player.id,
+                  player: model.currentAction.player,
                   word: model.currentInput,
                 },
               });

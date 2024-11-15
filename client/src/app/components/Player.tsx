@@ -4,71 +4,79 @@ import { type MouseEventHandler, type RefObject, useState } from "react";
 
 import type { HintState } from "contact/app/data/player";
 
-// TODO - merge with HintState
 export type ContactState =
   | { tag: "declared" }
   | { tag: "revealed"; success: boolean; word: string };
 
+export type PlayerState = ContactState | HintState;
+
 export type Props = {
-  contactState: ContactState | undefined;
   countdownMillis: number | undefined;
-  hintState: HintState;
-  id: string;
   inputRef: RefObject<HTMLInputElement>;
   isTyping: boolean;
   name: string;
   onClickCancel: MouseEventHandler<HTMLDivElement>;
   onClickContact: MouseEventHandler<HTMLDivElement>;
+  state: PlayerState;
+};
+
+const playerStyles = (
+  state: PlayerState,
+  countdownMillis: number | undefined,
+  isSelected: boolean
+) => {
+  if (state.tag === "thinking" || state.tag === "sharing") {
+    // is hinting
+
+    return {
+      classes: {
+        borderColor: isSelected ? "border-zinc-800" : "border-zinc-300",
+        coverHoverVisibility: "group-hover:visible",
+        coverVisibility: "invisible",
+        cursor: "cursor-pointer",
+      },
+      coverText: isSelected ? "cancel" : "contact",
+    };
+  }
+
+  // is contacting
+
+  return {
+    classes: {
+      borderColor:
+        state.tag === "declared"
+          ? "border-blue-800"
+          : state.success
+          ? "border-green-800"
+          : "border-red-800",
+      coverHoverVisibility:
+        countdownMillis !== undefined
+          ? "group-hover:visible"
+          : "group-hover:invisible",
+      coverVisibility: countdownMillis !== undefined ? "visible" : "invisible",
+      cursor: "auto",
+    },
+    coverText:
+      countdownMillis !== undefined ? `${countdownMillis / 1000}` : undefined,
+  };
 };
 
 export default function Player({
-  contactState,
   countdownMillis,
-  hintState,
-  id,
   inputRef,
   isTyping,
   name,
   onClickCancel,
   onClickContact,
+  state,
 }: Props) {
   const [isSelected, setIsSelected] = useState<boolean>(false);
-  const borderColor =
-    contactState === undefined
-      ? isSelected
-        ? "border-zinc-800"
-        : "border-zinc-300"
-      : contactState.tag === "declared"
-      ? "border-blue-800"
-      : contactState.success
-      ? "border-green-800"
-      : "border-red-800";
 
-  // TODO - clean up
-  const classes =
-    contactState !== undefined
-      ? {
-          borderColor,
-          cursor: "auto",
-          hoverVisibility:
-            countdownMillis !== undefined
-              ? "group-hover:visible"
-              : "group-hover:invisible",
-          visibility: countdownMillis !== undefined ? "visible" : "invisible",
-        }
-      : {
-          borderColor,
-          cursor: "cursor-pointer",
-          hoverVisibility: "group-hover:visible",
-          visibility: "invisible",
-        };
-
-  const coverText =
-    contactState !== undefined && countdownMillis !== undefined
-      ? `${countdownMillis / 1000}`
-      : isSelected
-      ? "cancel"
-      : "contact";
+  const { classes, coverText } = playerStyles(
+    state,
+    countdownMillis,
+    isSelected
+  );
 
   const onClick: MouseEventHandler<HTMLDivElement> = (ev) => {
     if (isSelected) {
@@ -86,9 +94,9 @@ export default function Player({
   };
 
   return (
-    <div key={id} className="relative group">
+    <div className="relative group">
       <div
-        className={`absolute top-0 left-0 w-full h-full flex items-center justify-center rounded-lg bg-zinc-800 ${classes.visibility} ${classes.hoverVisibility}`}
+        className={`absolute top-0 left-0 w-full h-full flex items-center justify-center rounded-lg bg-zinc-800 ${classes.coverVisibility} ${classes.coverHoverVisibility}`}
         onClick={onClick}
       >
         <h3 className="text-zinc-100 text-center text-3xl uppercase">
@@ -103,10 +111,10 @@ export default function Player({
         >
           <h3>{name}</h3>
         </div>
-        {contactState !== undefined && contactState.tag === "revealed" ? (
-          <p className="ml-2">{contactState.word}</p>
-        ) : hintState.tag === "sharing" && hintState.word !== "" ? (
-          <p className="ml-2">{hintState.word}</p>
+        {state.tag === "revealed" ? (
+          <p className="ml-2">{state.word}</p>
+        ) : state.tag === "sharing" && state.word !== "" ? (
+          <p className="ml-2">{state.word}</p>
         ) : isTyping ? (
           <p className="ml-2 tracking-widest">...</p>
         ) : undefined}

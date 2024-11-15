@@ -7,15 +7,14 @@ export type PlayerId = WithBrand<string, "Player">;
 export type HintState = { tag: "sharing"; word: string } | { tag: "thinking" };
 
 export type PlayerAction =
-  | { tag: "contact"; player: { id: PlayerId; name: string } }
+  | { tag: "contact"; player: PlayerId }
   | { tag: "hinting" }
   | { tag: "thinking" };
 
 export type Player = {
   hintState: HintState;
-  id: PlayerId;
   isTyping: boolean;
-  name: string;
+  name: PlayerId;
 };
 
 export const playerIdCodec: Codec<PlayerId> = Codec.custom({
