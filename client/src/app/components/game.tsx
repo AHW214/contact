@@ -114,9 +114,32 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
         return model;
       }
 
+      const { guessingPlayer, hintingPlayer } = model.contact;
+      const contactingPlayers = [guessingPlayer, hintingPlayer];
+
+      const wasMyPlayerContacting = contactingPlayers.includes(
+        model.myPlayerName
+      );
+
+      const { currentAction, currentInput } = wasMyPlayerContacting
+        ? { currentAction: { tag: "thinking" as const }, currentInput: "" }
+        : model;
+
       return {
         ...model,
         contact: undefined,
+        currentAction,
+        currentInput,
+        players: Record.updateMany(
+          model.players,
+          contactingPlayers,
+          (player) => {
+            return {
+              ...player,
+              hintState: { tag: "thinking" },
+            };
+          }
+        ),
       };
     }
 
@@ -135,8 +158,6 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
         hintedWord: hintingWord,
         success,
       } = msg.data;
-
-      const contactStatus = success ? "succeeded" : "failed";
 
       return {
         ...model,

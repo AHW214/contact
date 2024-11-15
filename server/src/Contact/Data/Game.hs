@@ -13,6 +13,8 @@ module Contact.Data.Game
 where
 
 import Contact.Data.Player (Player (Player, playerName))
+import qualified Contact.Data.Player as Player
+import Data.Foldable (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -30,8 +32,19 @@ data Game = Game
   }
 
 clearContact :: Game -> Game
-clearContact game =
-  game {gameContact = Nothing}
+clearContact game@Game {gameContact, gamePlayers} =
+  case gameContact of
+    Nothing ->
+      game
+    Just contact ->
+      let contactingPlayers = getContactingPlayers contact
+       in Game
+            { gameContact = Nothing,
+              gamePlayers = adjustMany Player.clearMessage contactingPlayers gamePlayers
+            }
+  where
+    adjustMany :: (Ord k, Foldable t) => (a -> a) -> t k -> Map k a -> Map k a
+    adjustMany f keys mp = foldl' (flip $ Map.adjust f) mp keys
 
 setContact :: Game -> Contact -> Game
 setContact game contact =
@@ -62,3 +75,7 @@ newGame =
     { gameContact = Nothing,
       gamePlayers = Map.empty
     }
+
+getContactingPlayers :: Contact -> (Text, Text)
+getContactingPlayers Contact {contactGuessingPlayer, contactHintingPlayer} =
+  (contactGuessingPlayer, contactHintingPlayer)

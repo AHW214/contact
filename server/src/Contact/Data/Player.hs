@@ -1,6 +1,7 @@
 module Contact.Data.Player
   ( Event (..),
     Player (..),
+    clearMessage,
     dispatchEvent,
     newPlayer,
     receiveBroadcast,
@@ -34,6 +35,10 @@ data Player = Player
     playerName :: Text,
     playerSendQueue :: TBQueue Event
   }
+
+clearMessage :: Player -> Player
+clearMessage player =
+  player {playerMessage = ""}
 
 sendWebSocket :: Player -> ServerMessage -> IO ()
 sendWebSocket Player {playerConnection} =
