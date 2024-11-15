@@ -93,6 +93,9 @@ export default function Player({
     onClickContact(ev);
   };
 
+  // TODO - use clsx for long tailwind class organization?
+  // https://shnoman97.medium.com/simplify-your-tailwind-css-class-management-with-merge-and-clsx-42f1e2458fd8
+
   return (
     <div className="relative group">
       <div
