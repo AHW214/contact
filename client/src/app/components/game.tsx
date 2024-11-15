@@ -407,7 +407,12 @@ export default function Game({
       <div className="flex flex-col gap-1">
         <h3 className="text-zinc-400 text-sm">
           {model.contact !== undefined
-            ? `${model.contact.guessingPlayer} and ${model.contact.hintingPlayer} are about to contact`
+            ? model.contact.result !== undefined &&
+              model.countdown === undefined
+              ? model.contact.result.success
+                ? "success!"
+                : "failure..."
+              : `${model.contact.guessingPlayer} and ${model.contact.hintingPlayer} are about to contact`
             : model.currentInput === ""
             ? "words, words, words..."
             : model.currentAction.tag === "contact"

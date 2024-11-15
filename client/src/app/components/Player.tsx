@@ -70,6 +70,7 @@ export default function Player({
   onClickContact,
   state,
 }: Props) {
+  // TODO - if this player was contacting, set isSelected = false when contact ends
   const [isSelected, setIsSelected] = useState<boolean>(false);
 
   const { classes, coverText } = playerStyles(
