@@ -26,7 +26,7 @@ type Contact = {
     | {
         guessingWord: string;
         hintingWord: string;
-        success: boolean;
+        revealedLetter: string | undefined;
       }
     | undefined;
 };
@@ -129,6 +129,14 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
         ? { currentAction: { tag: "thinking" as const }, currentInput: "" }
         : model;
 
+      // TODO - can verify model.contact.result is defined further above
+      const revealedLetter = model.contact.result?.revealedLetter;
+
+      const secretWord =
+        revealedLetter !== undefined
+          ? updateSecretWord(model.secretWord, revealedLetter)
+          : model.secretWord;
+
       return {
         ...model,
         contact: undefined,
@@ -144,6 +152,7 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
             };
           }
         ),
+        secretWord,
       };
     }
 
@@ -163,24 +172,14 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
         maybeRevealedLetter,
       } = msg.data;
 
-      const { secretWord, success } =
-        maybeRevealedLetter !== null
-          ? {
-              secretWord: updateSecretWord(
-                model.secretWord,
-                maybeRevealedLetter
-              ),
-              success: true,
-            }
-          : { secretWord: model.secretWord, success: false };
+      const revealedLetter = maybeRevealedLetter ?? undefined;
 
       return {
         ...model,
         contact: {
           ...model.contact,
-          result: { guessingWord, hintingWord, success },
+          result: { guessingWord, hintingWord, revealedLetter },
         },
-        secretWord,
       };
     }
 
@@ -290,11 +289,11 @@ const playerContactState = (
     };
   }
 
-  const { guessingWord, hintingWord, success } = result;
+  const { guessingWord, hintingWord, revealedLetter } = result;
 
   return {
     tag: "revealed",
-    success,
+    success: revealedLetter !== undefined,
     word: isGuessing ? guessingWord : hintingWord,
   };
 };
@@ -422,7 +421,7 @@ export default function Game({
           {model.contact !== undefined
             ? model.contact.result !== undefined &&
               model.countdown === undefined
-              ? model.contact.result.success
+              ? model.contact.result.revealedLetter !== undefined
                 ? "success!"
                 : "failure..."
               : `${model.contact.guessingPlayer} and ${model.contact.hintingPlayer} are about to contact`
