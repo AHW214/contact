@@ -81,7 +81,7 @@ data RevealedContactMessage = RevealedContactMessage
     guessingPlayer :: Text,
     hintedWord :: Text,
     hintingPlayer :: Text,
-    success :: Bool
+    maybeRevealedLetter :: Maybe Char
   }
   deriving (Generic, Show)
 

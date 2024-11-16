@@ -53,8 +53,9 @@ data Server = Server
     serverLobby :: TVar (Map UUID WS.Connection)
   }
 
-newtype RoomResponse = RoomResponse
-  { players :: [Text]
+data RoomResponse = RoomResponse
+  { players :: [Text],
+    secretWordRevealed :: Text
   }
   deriving (Generic)
 
@@ -66,13 +67,13 @@ mkHttpApp server = scottyApp $ do
     -- TODO - use when rooms are implemented server-side
     -- roomId <- Scotty.queryParam "roomId"
 
-    players <- liftIO $ STM.atomically $ do
-      Game {gamePlayers} <- readGame server
-      pure $ Map.keys gamePlayers
+    (players, secretWordRevealed) <- liftIO $ STM.atomically $ do
+      Game {gamePlayers, gameSecretWordRevealed} <- readGame server
+      pure (Map.keys gamePlayers, gameSecretWordRevealed)
 
     liftIO $ putStrLn $ "current players: " <> show players
 
-    Scotty.json $ RoomResponse {players}
+    Scotty.json $ RoomResponse {players, secretWordRevealed}
 
 mkWsApp :: Server -> WS.ServerApp
 mkWsApp server pendingConnection = do
@@ -173,7 +174,7 @@ handlePlayer server player@Player {playerName} = do
         Player.dispatchEvent player $ Broadcast msg
 
 handleMessage :: Server -> Player -> Event -> IO Bool
-handleMessage server player@Player {playerName} message =
+handleMessage server@Server {serverGame} player@Player {playerName} message =
   case message of
     Broadcast msg -> do
       Player.sendWebSocket player msg
@@ -220,8 +221,12 @@ handleMessage server player@Player {playerName} message =
 
               runAfterDelay 4500 $ do
                 STM.atomically $ do
-                  let success =
-                        guessingWord == hintingWord
+                  game <- readGame server
+
+                  let result =
+                        if guessingWord == hintingWord
+                          then Just $ Game.revealSecretLetter game
+                          else Nothing
 
                       msgOut =
                         RevealedContact $
@@ -230,8 +235,14 @@ handleMessage server player@Player {playerName} message =
                               guessingPlayer = playerName,
                               hintedWord = hintingWord,
                               hintingPlayer,
-                              success
+                              maybeRevealedLetter = fmap snd result
                             }
+
+                  case result of
+                    Just (game', _) ->
+                      STM.writeTVar serverGame game'
+                    Nothing ->
+                      pure ()
 
                   broadcastMessage server msgOut
 

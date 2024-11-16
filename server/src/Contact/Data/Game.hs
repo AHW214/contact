@@ -7,6 +7,7 @@ module Contact.Data.Game
     hasPlayer,
     newGame,
     removePlayer,
+    revealSecretLetter,
     setContact,
     updatePlayer,
   )
@@ -18,6 +19,7 @@ import Data.Foldable (foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Text (Text)
+import qualified Data.Text as Text
 
 data Contact = Contact
   { contactGuessingPlayer :: Text,
@@ -28,7 +30,9 @@ data Contact = Contact
 
 data Game = Game
   { gameContact :: Maybe Contact,
-    gamePlayers :: Map Text Player
+    gamePlayers :: Map Text Player,
+    gameSecretWord :: Text,
+    gameSecretWordRevealed :: Text
   }
 
 clearContact :: Game -> Game
@@ -38,7 +42,7 @@ clearContact game@Game {gameContact, gamePlayers} =
       game
     Just contact ->
       let contactingPlayers = getContactingPlayers contact
-       in Game
+       in game
             { gameContact = Nothing,
               gamePlayers = adjustMany Player.clearMessage contactingPlayers gamePlayers
             }
@@ -69,11 +73,27 @@ removePlayer :: Game -> Player -> Game
 removePlayer game@Game {gamePlayers} Player {playerName} =
   game {gamePlayers = Map.delete playerName gamePlayers}
 
+revealSecretLetter :: Game -> (Game, Char)
+revealSecretLetter game@Game {gameSecretWord, gameSecretWordRevealed} =
+  (game {gameSecretWordRevealed = secretWordRevealed}, letterRevealed)
+  where
+    letterRevealed :: Char
+    letterRevealed =
+      -- TODO - feels jank
+      -- TODO - maybe use NonEmpty Char instead of Text ?
+      maybe ' ' snd $ Text.unsnoc secretWordRevealed
+
+    secretWordRevealed :: Text
+    secretWordRevealed =
+      Text.take (1 + Text.length gameSecretWordRevealed) gameSecretWord
+
 newGame :: Game
 newGame =
   Game
     { gameContact = Nothing,
-      gamePlayers = Map.empty
+      gamePlayers = Map.empty,
+      gameSecretWord = "evangelion",
+      gameSecretWordRevealed = "evang"
     }
 
 getContactingPlayers :: Contact -> (Text, Text)

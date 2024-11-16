@@ -11,7 +11,8 @@ import {
 import PlayerInput from "contact/app/components/player-input";
 import PlayerView, { type ContactState } from "contact/app/components/player";
 import WordDisplay, {
-  type TargetWord,
+  type SecretWord,
+  updateSecretWord,
 } from "contact/app/components/word-display";
 import Wordmaster from "contact/app/components/wordmaster";
 import type { Player, PlayerAction, PlayerId } from "contact/app/data/player";
@@ -32,11 +33,13 @@ type Contact = {
 
 type Model = {
   contact: Contact | undefined;
+  // TODO - merge model.countdown into model.contact
   countdown: number | undefined;
   currentAction: PlayerAction;
   currentInput: string;
   myPlayerName: PlayerId;
   players: Record<PlayerId, Player>;
+  secretWord: SecretWord;
 };
 
 type Msg =
@@ -53,6 +56,7 @@ type GameProps = {
   myPlayerName: PlayerId;
   // TODO - currently duplicated between Room and Game components
   players: Record<PlayerId, Player>;
+  secretWordRevealed: string;
   sendServer: (msg: ClientMessage) => void;
 };
 
@@ -156,8 +160,19 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
       const {
         guessedWord: guessingWord,
         hintedWord: hintingWord,
-        success,
+        maybeRevealedLetter,
       } = msg.data;
+
+      const { secretWord, success } =
+        maybeRevealedLetter !== null
+          ? {
+              secretWord: updateSecretWord(
+                model.secretWord,
+                maybeRevealedLetter
+              ),
+              success: true,
+            }
+          : { secretWord: model.secretWord, success: false };
 
       return {
         ...model,
@@ -165,6 +180,7 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
           ...model.contact,
           result: { guessingWord, hintingWord, success },
         },
+        secretWord,
       };
     }
 
@@ -287,13 +303,9 @@ export default function Game({
   lastServerMessage,
   myPlayerName,
   players,
+  secretWordRevealed,
   sendServer,
 }: GameProps) {
-  const MOCK_TARGET_WORD: TargetWord = {
-    status: "guessing",
-    word: "evang",
-  };
-
   const MOCK_WORDMASTER = "Shinji";
 
   const inputRef: Ref<HTMLInputElement> = useRef(null);
@@ -306,6 +318,7 @@ export default function Game({
     currentInput: "",
     myPlayerName,
     players,
+    secretWord: { status: "guessing", word: secretWordRevealed },
   };
 
   const [model, dispatch] = useReducer(update, initModel);
@@ -383,7 +396,7 @@ export default function Game({
 
   return (
     <div className="flex flex-col gap-8 items-center">
-      <WordDisplay target={MOCK_TARGET_WORD} />
+      <WordDisplay secretWord={model.secretWord} />
       <Wordmaster id="0" name={MOCK_WORDMASTER} />
       <div className="flex gap-2">
         {Object.values(restPlayers).map((player) => (

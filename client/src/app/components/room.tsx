@@ -27,6 +27,7 @@ type Msg = { tag: "receivedServerMessage"; message: ServerMessage };
 type RoomProps = {
   playersInGame: string[];
   roomId: string;
+  secretWordRevealed: string;
   webSocketUrl: string;
 };
 
@@ -66,7 +67,6 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
             message === ""
               ? { tag: "thinking" }
               : { tag: "sharing", word: message },
-          id: name,
           isTyping: false,
           name,
         };
@@ -103,6 +103,7 @@ const update = (model: Model, msg: Msg): Model => {
 export default function Room({
   playersInGame,
   roomId,
+  secretWordRevealed,
   webSocketUrl,
 }: RoomProps) {
   const initModel: Model = {
@@ -159,6 +160,7 @@ export default function Room({
           lastServerMessage={lastServerMessage}
           myPlayerName={playerName}
           players={players}
+          secretWordRevealed={secretWordRevealed}
           sendServer={sendServer}
         />
       );

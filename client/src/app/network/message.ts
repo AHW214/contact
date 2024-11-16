@@ -44,7 +44,7 @@ export type ServerMessage =
         guessingPlayer: PlayerId;
         hintedWord: string;
         hintingPlayer: PlayerId;
-        success: boolean;
+        maybeRevealedLetter: string | null;
       };
     }
   | { tag: "sharedHint"; data: { description: string; player: PlayerId } }
@@ -83,7 +83,7 @@ export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
     guessingPlayer: playerIdCodec,
     hintedWord: C.string,
     hintingPlayer: playerIdCodec,
-    success: C.boolean,
+    maybeRevealedLetter: C.nullable(C.string),
   }),
   Codec_.tagged("sharedHint", { description: C.string, player: playerIdCodec }),
   Codec_.tagged("syncGame", {
