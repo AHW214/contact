@@ -9,6 +9,7 @@ module Contact.Data.Game
     removePlayer,
     revealSecretLetter,
     setContact,
+    updateContact,
     updatePlayer,
   )
 where
@@ -23,9 +24,9 @@ import qualified Data.Text as Text
 
 data Contact = Contact
   { contactGuessingPlayer :: Text,
-    contactGuessingWord :: Text,
+    contactGuessingWord :: Maybe Text,
     contactHintingPlayer :: Text,
-    contactHintingWord :: Text
+    contactHintingWord :: Maybe Text
   }
 
 data Game = Game
@@ -99,3 +100,20 @@ newGame =
 getContactingPlayers :: Contact -> (Text, Text)
 getContactingPlayers Contact {contactGuessingPlayer, contactHintingPlayer} =
   (contactGuessingPlayer, contactHintingPlayer)
+
+updateContact :: Game -> Player -> Maybe Text -> Game
+updateContact game@Game {gameContact} player maybeWord =
+  let update contact = updateContactWord contact player maybeWord
+   in game {gameContact = update <$> gameContact}
+
+updateContactWord :: Contact -> Player -> Maybe Text -> Contact
+updateContactWord contact player maybeWord
+  | isPlayerGuessing = contact {contactGuessingWord = maybeWord}
+  | isPlayerHinting = contact {contactHintingWord = maybeWord}
+  | otherwise = contact
+  where
+    isPlayerHinting =
+      playerName player == contactHintingPlayer contact
+
+    isPlayerGuessing =
+      playerName player == contactGuessingPlayer contact

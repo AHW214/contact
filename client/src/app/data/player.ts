@@ -13,6 +13,7 @@ export type PlayerAction =
 
 export type Player = {
   hintState: HintState;
+  // TODO - implement typing indicator
   isTyping: boolean;
   name: PlayerId;
 };

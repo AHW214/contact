@@ -77,9 +77,9 @@ newtype JoinedGameMessage = JoinedGameMessage
 instance ToJSON JoinedGameMessage
 
 data RevealedContactMessage = RevealedContactMessage
-  { guessedWord :: Text,
+  { guessedWord :: Maybe Text,
     guessingPlayer :: Text,
-    hintedWord :: Text,
+    hintedWord :: Maybe Text,
     hintingPlayer :: Text,
     maybeRevealedLetter :: Maybe Char
   }

@@ -3,7 +3,8 @@
 module Contact.Message.Client
   ( ChooseNameMessage (..),
     ClientMessage (..),
-    ContactMessage (..),
+    ConfirmContactMessage (..),
+    DeclareContactMessage (..),
     HintMessage (..),
     LobbyClientMessage (..),
   )
@@ -25,7 +26,8 @@ import GHC.Generics (Generic, Rep)
 
 data ClientMessage
   = ClearHint
-  | Contact ContactMessage
+  | ConfirmContact ConfirmContactMessage
+  | DeclareContact DeclareContactMessage
   | Disconnect
   | Hint HintMessage
   deriving (Generic, Show)
@@ -33,13 +35,19 @@ data ClientMessage
 instance FromJSON ClientMessage where
   parseJSON = parseTaggedJSON
 
-data ContactMessage = ContactMessage
-  { player :: Text,
-    word :: Text
+newtype ConfirmContactMessage = ConfirmContactMessage
+  { maybeWord :: Maybe Text
   }
   deriving (Generic, Show)
 
-instance FromJSON ContactMessage
+instance FromJSON ConfirmContactMessage
+
+newtype DeclareContactMessage = DeclareContactMessage
+  { player :: Text
+  }
+  deriving (Generic, Show)
+
+instance FromJSON DeclareContactMessage
 
 newtype HintMessage = HintMessage
   { description :: Text

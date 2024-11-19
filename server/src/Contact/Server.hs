@@ -24,6 +24,7 @@ import qualified Contact.Data.Game as Game
 import Contact.Data.Player (Event (..), Player (..), newPlayer)
 import qualified Contact.Data.Player as Player
 import Contact.Message.Client
+import qualified Contact.Message.Client as Client
 import Contact.Message.Server
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (Concurrently (..), async)
@@ -185,71 +186,84 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
       case msg of
         ClearHint -> do
           let msgOut = ClearedHint $ ClearedHintMessage {playerName}
+
           STM.atomically $ do
             modifyPlayer server player $ \p -> p {playerMessage = ""}
             broadcastMessage server msgOut
+
           pure True
-        Contact (ContactMessage {player = hintingPlayer, word = guessingWord}) -> do
-          maybeHintingWord <- STM.atomically $ do
-            Game {gamePlayers} <- readGame server
-            pure (playerMessage <$> Map.lookup hintingPlayer gamePlayers)
+        ConfirmContact (ConfirmContactMessage {maybeWord}) -> do
+          STM.atomically $
+            modifyGame server $
+              \game -> Game.updateContact game player maybeWord
 
-          case maybeHintingWord of
-            Nothing ->
-              -- TODO - send error message to client?
-              pure ()
-            Just hintingWord -> do
+          pure True
+
+        -- TODO - this branch v messy, can refactor
+        Client.DeclareContact (DeclareContactMessage {player = hintingPlayer}) -> do
+          STM.atomically $ do
+            let contact =
+                  Game.Contact
+                    { contactGuessingPlayer = playerName,
+                      contactGuessingWord = Nothing,
+                      contactHintingPlayer = hintingPlayer,
+                      contactHintingWord = Nothing
+                    }
+
+            modifyGame server $ \game -> Game.setContact game contact
+
+            let msgOut =
+                  DeclaredContact $
+                    DeclaredContactMessage
+                      { fromPlayer = playerName,
+                        toPlayer = hintingPlayer
+                      }
+
+            broadcastMessage server msgOut
+
+          -- TODO - make sure players have time to confirm on client side
+          runAfterDelay 4500 $ do
+            STM.atomically $ do
+              game@Game {gameContact} <- readGame server
+
+              case gameContact of
+                Nothing ->
+                  -- TODO - error case
+                  pure ()
+                Just
+                  Game.Contact
+                    { contactGuessingPlayer,
+                      contactGuessingWord,
+                      contactHintingPlayer,
+                      contactHintingWord
+                    } -> do
+                    let result =
+                          if contactGuessingWord == contactHintingWord
+                            then Just $ Game.revealSecretLetter game
+                            else Nothing
+
+                        msgOut =
+                          RevealedContact $
+                            RevealedContactMessage
+                              { guessedWord = contactGuessingWord,
+                                guessingPlayer = contactGuessingPlayer,
+                                hintedWord = contactHintingWord,
+                                hintingPlayer = contactHintingPlayer,
+                                maybeRevealedLetter = fmap snd result
+                              }
+
+                    case result of
+                      Just (game', _) ->
+                        STM.writeTVar serverGame game'
+                      Nothing ->
+                        pure ()
+
+                    broadcastMessage server msgOut
+
+            runAfterDelay 3000 $
               STM.atomically $ do
-                let contact =
-                      Game.Contact
-                        { contactGuessingPlayer = playerName,
-                          contactGuessingWord = guessingWord,
-                          contactHintingPlayer = hintingPlayer,
-                          contactHintingWord = hintingWord
-                        }
-
-                modifyGame server $ \game -> Game.setContact game contact
-
-                let msgOut =
-                      DeclaredContact $
-                        DeclaredContactMessage
-                          { fromPlayer = playerName,
-                            toPlayer = hintingPlayer
-                          }
-
-                broadcastMessage server msgOut
-
-              runAfterDelay 4500 $ do
-                STM.atomically $ do
-                  game <- readGame server
-
-                  let result =
-                        if guessingWord == hintingWord
-                          then Just $ Game.revealSecretLetter game
-                          else Nothing
-
-                      msgOut =
-                        RevealedContact $
-                          RevealedContactMessage
-                            { guessedWord = guessingWord,
-                              guessingPlayer = playerName,
-                              hintedWord = hintingWord,
-                              hintingPlayer,
-                              maybeRevealedLetter = fmap snd result
-                            }
-
-                  case result of
-                    Just (game', _) ->
-                      STM.writeTVar serverGame game'
-                    Nothing ->
-                      pure ()
-
-                  broadcastMessage server msgOut
-
-                runAfterDelay 3000 $
-                  STM.atomically $ do
-                    modifyGame server Game.clearContact
-                    broadcastMessage server EndContact
+                modifyGame server Game.clearContact
+                broadcastMessage server EndContact
 
           pure True
         Disconnect -> do
