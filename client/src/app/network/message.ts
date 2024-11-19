@@ -4,6 +4,9 @@ import * as C from "purify-ts/Codec";
 import { type PlayerId, playerIdCodec } from "contact/app/data/player";
 
 namespace Codec_ {
+  // TODO - add codec to convert between undefined in TS and null in JSON
+  // (Maybe datatype™)
+
   export const tagged = <T extends string, U extends { [x: string]: any }>(
     tag: T,
     data: U
@@ -22,7 +25,8 @@ namespace Codec_ {
 export type ClientMessage =
   | { tag: "chooseName"; data: { name: string } }
   | { tag: "clearHint" }
-  | { tag: "contact"; data: { player: PlayerId; word: string } }
+  | { tag: "confirmContact"; data: { maybeWord: string | null } }
+  | { tag: "declareContact"; data: { player: PlayerId } }
   | { tag: "disconnect" }
   | { tag: "hint"; data: { description: string } };
 
@@ -40,9 +44,9 @@ export type ServerMessage =
   | {
       tag: "revealedContact";
       data: {
-        guessedWord: string;
+        guessedWord: string | null;
         guessingPlayer: PlayerId;
-        hintedWord: string;
+        hintedWord: string | null;
         hintingPlayer: PlayerId;
         maybeRevealedLetter: string | null;
       };
@@ -79,9 +83,9 @@ export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
   Codec_.tagged("joinedGame", { playerName: playerIdCodec }),
   Codec_.tagged("leftGame", { playerName: playerIdCodec }),
   Codec_.tagged("revealedContact", {
-    guessedWord: C.string,
+    guessedWord: C.nullable(C.string),
     guessingPlayer: playerIdCodec,
-    hintedWord: C.string,
+    hintedWord: C.nullable(C.string),
     hintingPlayer: playerIdCodec,
     maybeRevealedLetter: C.nullable(C.string),
   }),

@@ -238,6 +238,7 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
                       contactHintingWord
                     } -> do
                     let result =
+                          -- TODO - want Nothing and Nothing -> FALSE
                           if contactGuessingWord == contactHintingWord
                             then Just $ Game.revealSecretLetter game
                             else Nothing

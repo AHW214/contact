@@ -6,7 +6,7 @@ import type { HintState } from "contact/app/data/player";
 
 export type ContactState =
   | { tag: "declared" }
-  | { tag: "revealed"; success: boolean; word: string };
+  | { tag: "revealed"; success: boolean; word: string | undefined };
 
 export type PlayerState = ContactState | HintState;
 
@@ -116,7 +116,7 @@ export default function Player({
           <h3>{name}</h3>
         </div>
         {state.tag === "revealed" ? (
-          <p className="ml-2">{state.word}</p>
+          <p className="ml-2">{state.word ?? "..."}</p>
         ) : state.tag === "sharing" && state.word !== "" ? (
           <p className="ml-2">{state.word}</p>
         ) : isTyping ? (

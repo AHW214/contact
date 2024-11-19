@@ -24,8 +24,8 @@ type Contact = {
   hintingPlayer: PlayerId;
   result:
     | {
-        guessingWord: string;
-        hintingWord: string;
+        guessingWord: string | undefined;
+        hintingWord: string | undefined;
         revealedLetter: string | undefined;
       }
     | undefined;
@@ -164,21 +164,19 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 
       const { guessingPlayer, hintingPlayer } = model.contact;
 
-      // TODO - can remove above Player fields from message
-      // TODO - make message field names consistent
-      const {
-        guessedWord: guessingWord,
-        hintedWord: hintingWord,
-        maybeRevealedLetter,
-      } = msg.data;
-
-      const revealedLetter = maybeRevealedLetter ?? undefined;
+      // TODO - can remove above Player fields from model
+      // TODO - make message field names consistent (e.g. "guessed" -> "guessing")
+      const { guessedWord, hintedWord, maybeRevealedLetter } = msg.data;
 
       return {
         ...model,
         contact: {
           ...model.contact,
-          result: { guessingWord, hintingWord, revealedLetter },
+          result: {
+            guessingWord: guessedWord ?? undefined,
+            hintingWord: hintedWord ?? undefined,
+            revealedLetter: maybeRevealedLetter ?? undefined,
+          },
         },
       };
     }
@@ -406,12 +404,17 @@ export default function Game({
             key={player.name}
             name={player.name}
             onClickCancel={() => dispatch({ tag: "clickedCancel" })}
-            onClickContact={() =>
+            onClickContact={() => {
               dispatch({
                 tag: "clickedContact",
                 player: player.name,
-              })
-            }
+              });
+
+              sendServer({
+                tag: "declareContact",
+                data: { player: player.name },
+              });
+            }}
             state={playerContactState(model, player.name) ?? player.hintState}
           />
         ))}
@@ -449,10 +452,9 @@ export default function Game({
           onEnter={() => {
             if (model.currentAction.tag === "contact") {
               sendServer({
-                tag: "contact",
+                tag: "confirmContact",
                 data: {
-                  player: model.currentAction.player,
-                  word: model.currentInput,
+                  maybeWord: model.currentInput || null,
                 },
               });
             } else if (model.currentAction.tag === "thinking") {
