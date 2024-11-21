@@ -322,7 +322,7 @@ const playerContactState = (model: Model, player: Player): PlayerState => {
 };
 
 const inputHeaderText = (model: Model): string => {
-  const { contact, countdown, currentAction } = model;
+  const { contact, countdown, currentAction, myPlayerName } = model;
 
   if (contact !== undefined) {
     const { guessingPlayer, hintingPlayer, result } = contact;
@@ -331,6 +331,13 @@ const inputHeaderText = (model: Model): string => {
     const isResultHidden = countdown !== undefined && countdown > 0;
 
     if (isResultUnknown || isResultHidden) {
+      if (isPlayerContacting(contact, myPlayerName)) {
+        const otherPlayer =
+          myPlayerName === guessingPlayer ? hintingPlayer : guessingPlayer;
+
+        return `you are about to contact with ${otherPlayer}`;
+      }
+
       return `${guessingPlayer} and ${hintingPlayer} are about to contact`;
     }
 
