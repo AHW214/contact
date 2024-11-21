@@ -333,14 +333,7 @@ const playerContactState = (model: Model, player: Player): PlayerState => {
 };
 
 const inputHeaderText = (model: Model): string => {
-  const {
-    contact,
-    countdown,
-    currentAction,
-    currentInput,
-    myPlayerName,
-    secretWord,
-  } = model;
+  const { contact, countdown, currentAction, myPlayerName, secretWord } = model;
 
   if (contact !== undefined) {
     const { guessingPlayer, hintingPlayer, result } = contact;
