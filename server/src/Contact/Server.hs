@@ -223,6 +223,7 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
             broadcastMessage server msgOut
 
           -- TODO - make sure players have time to confirm on client side
+          -- TODO - magic numbers
           runAfterDelay 4500 $ do
             STM.atomically $ do
               game@Game {gameContact} <- readGame server
@@ -238,6 +239,8 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
                       contactHintingPlayer,
                       contactHintingWord
                     } -> do
+                    -- TODO - CHECK FOR WIN CONDITIONS AND INFORM PLAYERS IF
+                    -- GAME OVER
                     let result =
                           case (contactGuessingWord, contactHintingWord) of
                             (Just guessingWord, Just hintingWord)
@@ -263,6 +266,7 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
 
                     broadcastMessage server msgOut
 
+            -- TODO - magic numbers
             runAfterDelay 3000 $
               STM.atomically $ do
                 modifyGame server Game.clearContact
