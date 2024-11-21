@@ -386,8 +386,6 @@ export default function Game({
 
   const { [myPlayerName]: myPlayer, ...restPlayers } = model.players;
 
-  const isAnyoneContacting = model.contact !== undefined;
-
   if (myPlayer === undefined) {
     return <div>no player???</div>;
   }
@@ -443,9 +441,7 @@ export default function Game({
             model.countdown !== undefined && model.countdown > 0
           }
           ref={inputRef}
-          // TODO - object access not safe
-          // store reference to own player?
-          state={playerContactState(model, model.players[model.myPlayerName])}
+          state={playerContactState(model, myPlayer)}
           onChange={(ev) => {
             if (model.currentAction.tag !== "hinting") {
               dispatch({ tag: "changedInput", value: ev.target.value });
