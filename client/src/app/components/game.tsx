@@ -244,7 +244,8 @@ const update = (model: Model, msg: Msg): Model => {
       const { currentAction } = model;
 
       const isInputDisabled =
-        currentAction.tag === "contact" && currentAction.confirmed;
+        currentAction.tag === "hinting" ||
+        (currentAction.tag === "contact" && currentAction.confirmed);
 
       return isInputDisabled ? model : { ...model, currentInput: msg.value };
     }
@@ -502,9 +503,7 @@ export default function Game({
           ref={inputRef}
           state={playerContactState(model, myPlayer)}
           onChange={(ev) => {
-            if (model.currentAction.tag !== "hinting") {
-              dispatch({ tag: "changedInput", value: ev.target.value });
-            }
+            dispatch({ tag: "changedInput", value: ev.target.value });
           }}
           onEnter={() => {
             if (model.currentAction.tag === "contact") {

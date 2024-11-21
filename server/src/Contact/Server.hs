@@ -193,6 +193,7 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
 
           pure True
         ConfirmContact (ConfirmContactMessage {maybeWord}) -> do
+          -- TODO - VERIFY WORD PREFIXED BY KNOWN LETTERS
           STM.atomically $
             modifyGame server $
               \game -> Game.updateContact game player maybeWord
