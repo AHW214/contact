@@ -9,7 +9,7 @@ import {
 } from "react";
 
 import PlayerInput from "contact/app/components/player-input";
-import PlayerView, { type ContactState } from "contact/app/components/player";
+import PlayerView, { type PlayerState } from "contact/app/components/player";
 import WordDisplay, {
   type SecretWord,
   updateSecretWord,
@@ -263,36 +263,37 @@ const update = (model: Model, msg: Msg): Model => {
   }
 };
 
-const playerContactState = (
-  model: Model,
-  player: PlayerId
-): ContactState | undefined => {
+const playerContactState = (model: Model, player: Player): PlayerState => {
   if (model.contact === undefined) {
-    return undefined;
+    return { tag: "hintingWord", hint: player.hintState };
   }
 
   const { guessingPlayer, hintingPlayer, result } = model.contact;
 
-  const isGuessing = player === guessingPlayer;
-  const isHinting = player === hintingPlayer;
+  const isGuessing = player.name === guessingPlayer;
+  const isHinting = player.name === hintingPlayer;
   const isContacting = isGuessing || isHinting;
 
   if (!isContacting) {
-    return undefined;
+    return { tag: "spectatingContact" };
   }
 
   if (result === undefined) {
     return {
-      tag: "declared",
+      tag: "performingContact",
+      contact: { tag: "declared" },
     };
   }
 
   const { guessingWord, hintingWord, revealedLetter } = result;
 
   return {
-    tag: "revealed",
-    success: revealedLetter !== undefined,
-    word: isGuessing ? guessingWord : hintingWord,
+    tag: "performingContact",
+    contact: {
+      tag: "revealed",
+      success: revealedLetter !== undefined,
+      word: isGuessing ? guessingWord : hintingWord,
+    },
   };
 };
 
@@ -415,7 +416,7 @@ export default function Game({
                 data: { player: player.name },
               });
             }}
-            state={playerContactState(model, player.name) ?? player.hintState}
+            state={playerContactState(model, player)}
           />
         ))}
       </div>
@@ -437,13 +438,14 @@ export default function Game({
             : "press enter to share your hint with everyone"}
         </h3>
         <PlayerInput
-          contactState={playerContactState(model, model.myPlayerName)}
           currentAction={model.currentAction}
           hideContactResult={
             model.countdown !== undefined && model.countdown > 0
           }
-          isAnyoneContacting={isAnyoneContacting}
           ref={inputRef}
+          // TODO - object access not safe
+          // store reference to own player?
+          state={playerContactState(model, model.players[model.myPlayerName])}
           onChange={(ev) => {
             if (model.currentAction.tag !== "hinting") {
               dispatch({ tag: "changedInput", value: ev.target.value });

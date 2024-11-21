@@ -8,7 +8,10 @@ export type ContactState =
   | { tag: "declared" }
   | { tag: "revealed"; success: boolean; word: string | undefined };
 
-export type PlayerState = ContactState | HintState;
+export type PlayerState =
+  | { tag: "hintingWord"; hint: HintState }
+  | { tag: "performingContact"; contact: ContactState }
+  | { tag: "spectatingContact" };
 
 export type Props = {
   countdownMillis: number | undefined;
@@ -25,7 +28,7 @@ const playerStyles = (
   countdownMillis: number | undefined,
   isSelected: boolean
 ) => {
-  if (state.tag === "thinking" || state.tag === "sharing") {
+  if (state.tag === "hintingWord" || state.tag === "spectatingContact") {
     // is hinting
 
     return {
@@ -39,14 +42,16 @@ const playerStyles = (
     };
   }
 
-  // is contacting
+  // is performing contact
+
+  const { contact } = state;
 
   return {
     classes: {
       borderColor:
-        state.tag === "declared"
+        contact.tag === "declared"
           ? "border-blue-800"
-          : state.success
+          : contact.success
           ? "border-green-800"
           : "border-red-800",
       coverHoverVisibility:
@@ -115,13 +120,20 @@ export default function Player({
         >
           <h3>{name}</h3>
         </div>
-        {state.tag === "revealed" ? (
-          <p className="ml-2">{state.word ?? "..."}</p>
-        ) : state.tag === "sharing" && state.word !== "" ? (
-          <p className="ml-2">{state.word}</p>
-        ) : isTyping ? (
-          <p className="ml-2 tracking-widest">...</p>
-        ) : undefined}
+        {
+          // TODO - getting a bit verbose with the nested state properties
+          // maybe refactor out into separate function
+          state.tag === "performingContact" &&
+          state.contact.tag === "revealed" ? (
+            <p className="ml-2">{state.contact.word ?? "..."}</p>
+          ) : state.tag === "hintingWord" &&
+            state.hint.tag === "sharing" &&
+            state.hint.word !== "" ? (
+            <p className="ml-2">{state.hint.word}</p>
+          ) : isTyping ? (
+            <p className="ml-2 tracking-widest">...</p>
+          ) : undefined
+        }
       </div>
     </div>
   );
