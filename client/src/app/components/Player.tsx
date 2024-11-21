@@ -17,27 +17,25 @@ export type Props = {
   countdownMillis: number | undefined;
   isTyping: boolean;
   name: string;
-  onClickCancel: MouseEventHandler<HTMLDivElement>;
   onClickContact: MouseEventHandler<HTMLDivElement>;
   state: PlayerState;
 };
 
 const playerStyles = (
   state: PlayerState,
-  countdownMillis: number | undefined,
-  isSelected: boolean
+  countdownMillis: number | undefined
 ) => {
   if (state.tag === "hintingWord" || state.tag === "spectatingContact") {
     // is hinting
 
     return {
       classes: {
-        borderColor: isSelected ? "border-zinc-800" : "border-zinc-300",
+        borderColor: "border-zinc-300",
         coverHoverVisibility: "group-hover:visible",
         coverVisibility: "invisible",
         cursor: "cursor-pointer",
       },
-      coverText: isSelected ? "cancel" : "contact",
+      coverText: "contact",
     };
   }
 
@@ -69,27 +67,12 @@ export default function Player({
   countdownMillis,
   isTyping,
   name,
-  onClickCancel,
   onClickContact,
   state,
 }: Props) {
-  // TODO - if this player was contacting, set isSelected = false when contact ends
-  const [isSelected, setIsSelected] = useState<boolean>(false);
-
-  const { classes, coverText } = playerStyles(
-    state,
-    countdownMillis,
-    isSelected
-  );
+  const { classes, coverText } = playerStyles(state, countdownMillis);
 
   const onClick: MouseEventHandler<HTMLDivElement> = (ev) => {
-    if (isSelected) {
-      setIsSelected(false);
-      onClickCancel(ev);
-      return;
-    }
-
-    setIsSelected(true);
     onClickContact(ev);
   };
 

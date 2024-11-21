@@ -22,12 +22,15 @@ export default function PlayerInput({
   ...restProps
 }: PlayerInputProps) {
   const isSpectating = state.tag === "spectatingContact";
+  const isInputEmboldened =
+    (currentAction.tag === "hinting" && !isSpectating) ||
+    (currentAction.tag === "contact" && currentAction.confirmed);
 
   return (
     <Input
       {...restProps}
       className={`${
-        currentAction.tag === "hinting" && !isSpectating
+        isInputEmboldened
           ? "font-bold caret-transparent border-zinc-800"
           : "font-normal caret-inherit border-inherit"
       } ${

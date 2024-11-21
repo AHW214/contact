@@ -118,7 +118,10 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
       );
 
       const { currentAction, currentInput } = isMyPlayerContacting
-        ? { currentAction: { tag: "contact" as const }, currentInput: "" }
+        ? {
+            currentAction: { tag: "contact" as const, confirmed: false },
+            currentInput: "",
+          }
         : model;
 
       return {
@@ -231,7 +234,12 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 const update = (model: Model, msg: Msg): Model => {
   switch (msg.tag) {
     case "changedInput": {
-      return { ...model, currentInput: msg.value };
+      const { currentAction } = model;
+
+      const isInputDisabled =
+        currentAction.tag === "contact" && currentAction.confirmed;
+
+      return isInputDisabled ? model : { ...model, currentInput: msg.value };
     }
 
     case "clickedCancel": {
@@ -464,11 +472,6 @@ export default function Game({
             isTyping={player.isTyping}
             key={player.name}
             name={player.name}
-            onClickCancel={() => {
-              dispatch({ tag: "clickedCancel" });
-              inputRef.current?.focus();
-              inputRef.current?.select();
-            }}
             onClickContact={() => {
               dispatch({
                 tag: "clickedContact",
