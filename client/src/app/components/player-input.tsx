@@ -13,14 +13,14 @@ export interface PlayerInputProps extends InputProps {
   value: string;
 }
 
-const PlayerInput = ({
+export default function PlayerInput({
   currentAction,
   hideContactResult,
   ref,
   state,
   value,
   ...restProps
-}: PlayerInputProps) => {
+}: PlayerInputProps) {
   const isSpectating = state.tag === "spectatingContact";
 
   return (
@@ -43,7 +43,7 @@ const PlayerInput = ({
       placeholder={
         isSpectating
           ? "...suspense..."
-          : currentAction.tag === "contact"
+          : state.tag === "performingContact"
           ? "type your guess here..."
           : "type your hint here..."
       }
@@ -51,6 +51,4 @@ const PlayerInput = ({
       disabled={isSpectating}
     />
   );
-};
-
-export default PlayerInput;
+}

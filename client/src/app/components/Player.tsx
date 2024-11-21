@@ -1,6 +1,6 @@
 "use client";
 
-import { type MouseEventHandler, type RefObject, useState } from "react";
+import { type MouseEventHandler, useState } from "react";
 
 import type { HintState } from "contact/app/data/player";
 
@@ -15,7 +15,6 @@ export type PlayerState =
 
 export type Props = {
   countdownMillis: number | undefined;
-  inputRef: RefObject<HTMLInputElement>;
   isTyping: boolean;
   name: string;
   onClickCancel: MouseEventHandler<HTMLDivElement>;
@@ -68,7 +67,6 @@ const playerStyles = (
 
 export default function Player({
   countdownMillis,
-  inputRef,
   isTyping,
   name,
   onClickCancel,
@@ -92,10 +90,6 @@ export default function Player({
     }
 
     setIsSelected(true);
-
-    inputRef.current?.focus();
-    inputRef.current?.select();
-
     onClickContact(ev);
   };
 

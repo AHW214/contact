@@ -63,6 +63,11 @@ type GameProps = {
 const COUNTDOWN_TIME_MILLIS = 5000;
 const COUNTDOWN_TICK_MILLIS = 1000;
 
+const isPlayerContacting = (contact: Contact, player: PlayerId): boolean => {
+  const { guessingPlayer, hintingPlayer } = contact;
+  return [guessingPlayer, hintingPlayer].includes(player);
+};
+
 const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
   switch (msg.tag) {
     case "clearedHint": {
@@ -101,41 +106,51 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
     case "declaredContact": {
       const { fromPlayer, toPlayer } = msg.data;
 
+      const contact = {
+        guessingPlayer: fromPlayer,
+        hintingPlayer: toPlayer,
+        result: undefined,
+      };
+
+      const isMyPlayerContacting = isPlayerContacting(
+        contact,
+        model.myPlayerName
+      );
+
+      const { currentAction, currentInput } = isMyPlayerContacting
+        ? { currentAction: { tag: "contact" as const }, currentInput: "" }
+        : model;
+
       return {
         ...model,
-        contact: {
-          guessingPlayer: fromPlayer,
-          hintingPlayer: toPlayer,
-          result: undefined,
-        },
+        contact,
         countdown: COUNTDOWN_TIME_MILLIS,
+        currentAction,
+        currentInput,
       };
     }
 
     case "endContact": {
-      if (model.contact === undefined) {
+      if (model.contact === undefined || model.contact.result === undefined) {
         // TODO - handle error case
         return model;
       }
 
-      const { guessingPlayer, hintingPlayer } = model.contact;
-      const contactingPlayers = [guessingPlayer, hintingPlayer];
-
-      const wasMyPlayerContacting = contactingPlayers.includes(
-        model.myPlayerName
-      );
+      const { contact, myPlayerName } = model;
+      const wasMyPlayerContacting = isPlayerContacting(contact, myPlayerName);
 
       const { currentAction, currentInput } = wasMyPlayerContacting
         ? { currentAction: { tag: "thinking" as const }, currentInput: "" }
         : model;
 
-      // TODO - can verify model.contact.result is defined further above
-      const revealedLetter = model.contact.result?.revealedLetter;
+      const { revealedLetter } = model.contact.result;
 
       const secretWord =
         revealedLetter !== undefined
           ? updateSecretWord(model.secretWord, revealedLetter)
           : model.secretWord;
+
+      const { guessingPlayer, hintingPlayer } = contact;
 
       return {
         ...model,
@@ -144,7 +159,7 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
         currentInput,
         players: Record.updateMany(
           model.players,
-          contactingPlayers,
+          [guessingPlayer, hintingPlayer],
           (player) => {
             return {
               ...player,
@@ -215,19 +230,24 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 
 const update = (model: Model, msg: Msg): Model => {
   switch (msg.tag) {
-    case "changedInput":
+    case "changedInput": {
       return { ...model, currentInput: msg.value };
+    }
 
-    case "clickedCancel":
+    case "clickedCancel": {
       return { ...model, currentAction: { tag: "thinking" }, currentInput: "" };
+    }
 
-    case "clickedContact":
-      return {
-        ...model,
-        currentAction: { tag: "contact", player: msg.player },
-      };
+    case "clickedContact": {
+      // return {
+      //   ...model,
+      //   currentAction: { tag: "contact", player: msg.player },
+      //   currentInput: "",
+      // };
+      return model;
+    }
 
-    case "clickedEscape":
+    case "clickedEscape": {
       return model.currentAction.tag === "hinting"
         ? {
             ...model,
@@ -235,14 +255,16 @@ const update = (model: Model, msg: Msg): Model => {
             currentInput: "",
           }
         : model;
+    }
 
-    case "sharedHint":
+    case "sharedHint": {
       return {
         ...model,
         currentAction: { tag: "hinting" },
       };
+    }
 
-    case "tickCountdown":
+    case "tickCountdown": {
       if (model.countdown !== undefined) {
         const newCountdown = model.countdown - msg.millis;
 
@@ -253,13 +275,15 @@ const update = (model: Model, msg: Msg): Model => {
       }
 
       return model;
+    }
 
     case "receivedServerMessage": {
       return handleServerMessage(model, msg.message);
     }
 
-    default:
+    default: {
       return model;
+    }
   }
 };
 
@@ -295,6 +319,38 @@ const playerContactState = (model: Model, player: Player): PlayerState => {
       word: isGuessing ? guessingWord : hintingWord,
     },
   };
+};
+
+const inputHeaderText = (model: Model): string => {
+  const { contact, countdown, currentAction } = model;
+
+  if (contact !== undefined) {
+    const { guessingPlayer, hintingPlayer, result } = contact;
+
+    const isResultUnknown = result === undefined;
+    const isResultHidden = countdown !== undefined && countdown > 0;
+
+    if (isResultUnknown || isResultHidden) {
+      return `${guessingPlayer} and ${hintingPlayer} are about to contact`;
+    }
+
+    const isContactSuccessful = result.revealedLetter !== undefined;
+    return isContactSuccessful ? "success!" : "failure...";
+  }
+
+  switch (currentAction.tag) {
+    case "contact": {
+      return "enter your guess!";
+    }
+    case "hinting": {
+      return "press escape to stop sharing your hint";
+    }
+    case "thinking": {
+      return model.currentInput === ""
+        ? "words, words, words..."
+        : "press enter to share your hint with everyone";
+    }
+  }
 };
 
 export default function Game({
@@ -398,16 +454,22 @@ export default function Game({
         {Object.values(restPlayers).map((player) => (
           <PlayerView
             countdownMillis={model.countdown}
-            inputRef={inputRef}
             isTyping={player.isTyping}
             key={player.name}
             name={player.name}
-            onClickCancel={() => dispatch({ tag: "clickedCancel" })}
+            onClickCancel={() => {
+              dispatch({ tag: "clickedCancel" });
+              inputRef.current?.focus();
+              inputRef.current?.select();
+            }}
             onClickContact={() => {
               dispatch({
                 tag: "clickedContact",
                 player: player.name,
               });
+
+              inputRef.current?.focus();
+              inputRef.current?.select();
 
               sendServer({
                 tag: "declareContact",
@@ -419,22 +481,7 @@ export default function Game({
         ))}
       </div>
       <div className="flex flex-col gap-1">
-        <h3 className="text-zinc-400 text-sm">
-          {model.contact !== undefined
-            ? model.contact.result !== undefined &&
-              model.countdown === undefined
-              ? model.contact.result.revealedLetter !== undefined
-                ? "success!"
-                : "failure..."
-              : `${model.contact.guessingPlayer} and ${model.contact.hintingPlayer} are about to contact`
-            : model.currentInput === ""
-            ? "words, words, words..."
-            : model.currentAction.tag === "contact"
-            ? `press enter to contact with ${model.currentAction.player}`
-            : model.currentAction.tag === "hinting"
-            ? "press escape to stop sharing your hint"
-            : "press enter to share your hint with everyone"}
-        </h3>
+        <h3 className="text-zinc-400 text-sm">{inputHeaderText(model)}</h3>
         <PlayerInput
           currentAction={model.currentAction}
           hideContactResult={

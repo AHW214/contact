@@ -7,7 +7,7 @@ export type PlayerId = WithBrand<string, "Player">;
 export type HintState = { tag: "sharing"; word: string } | { tag: "thinking" };
 
 export type PlayerAction =
-  | { tag: "contact"; player: PlayerId }
+  | { tag: "contact" }
   | { tag: "hinting" }
   | { tag: "thinking" };
 
