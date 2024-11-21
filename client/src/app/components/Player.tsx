@@ -1,6 +1,4 @@
-"use client";
-
-import { type MouseEventHandler, useState } from "react";
+import { type MouseEventHandler } from "react";
 
 import type { HintState } from "contact/app/data/player";
 
