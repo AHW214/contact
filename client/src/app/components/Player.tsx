@@ -25,42 +25,63 @@ const playerStyles = (
   state: PlayerState,
   countdownMillis: number | undefined
 ) => {
-  if (state.tag === "hintingWord" || state.tag === "spectatingContact") {
-    // is hinting
+  switch (state.tag) {
+    case "hintingWord": {
+      const { hint } = state;
 
-    return {
-      classes: {
-        borderColor: "border-zinc-300",
-        coverHoverVisibility: "group-hover:visible",
-        coverVisibility: "invisible",
-        cursor: "cursor-pointer",
-      },
-      coverText: "contact",
-    };
+      return {
+        classes: {
+          borderColor: "border-zinc-300",
+          coverHoverVisibility:
+            hint.tag === "sharing"
+              ? "group-hover:visible"
+              : "group-hover:invisible",
+          coverVisibility: "invisible",
+          cursor: hint.tag === "sharing" ? "cursor-pointer" : "auto",
+        },
+        coverText: "contact",
+      };
+    }
+
+    case "performingContact": {
+      const { contact } = state;
+
+      return {
+        classes: {
+          borderColor:
+            contact.tag === "declared"
+              ? "border-blue-800"
+              : contact.success
+              ? "border-green-800"
+              : "border-red-800",
+          coverHoverVisibility:
+            countdownMillis !== undefined
+              ? "group-hover:visible"
+              : "group-hover:invisible",
+          coverVisibility:
+            countdownMillis !== undefined ? "visible" : "invisible",
+          cursor: "auto",
+        },
+        coverText:
+          countdownMillis !== undefined
+            ? `${countdownMillis / 1000}`
+            : undefined,
+      };
+    }
+
+    case "spectatingContact":
+    default: {
+      return {
+        classes: {
+          borderColor: "border-zinc-300",
+          coverHoverVisibility: "group-hover:invisible",
+          coverVisibility: "invisible",
+          cursor: "cursor-not-allowed",
+        },
+        coverText: undefined,
+      };
+    }
   }
-
-  // is performing contact
-
-  const { contact } = state;
-
-  return {
-    classes: {
-      borderColor:
-        contact.tag === "declared"
-          ? "border-blue-800"
-          : contact.success
-          ? "border-green-800"
-          : "border-red-800",
-      coverHoverVisibility:
-        countdownMillis !== undefined
-          ? "group-hover:visible"
-          : "group-hover:invisible",
-      coverVisibility: countdownMillis !== undefined ? "visible" : "invisible",
-      cursor: "auto",
-    },
-    coverText:
-      countdownMillis !== undefined ? `${countdownMillis / 1000}` : undefined,
-  };
 };
 
 export default function Player({

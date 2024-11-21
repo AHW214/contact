@@ -22,6 +22,12 @@ export default function PlayerInput({
   ...restProps
 }: PlayerInputProps) {
   const isSpectating = state.tag === "spectatingContact";
+
+  const wasSilentContact =
+    state.tag === "performingContact" &&
+    state.contact.tag === "revealed" &&
+    state.contact.word === undefined;
+
   const isInputEmboldened =
     (currentAction.tag === "hinting" && !isSpectating) ||
     (currentAction.tag === "contact" && currentAction.confirmed);
@@ -50,7 +56,13 @@ export default function PlayerInput({
           ? "type your guess here..."
           : "type your hint here..."
       }
-      value={isSpectating ? "" : value}
+      value={
+        isSpectating
+          ? ""
+          : wasSilentContact && !hideContactResult
+          ? "..."
+          : value
+      }
       disabled={isSpectating}
     />
   );
