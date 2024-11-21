@@ -103,6 +103,13 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
       };
     }
 
+    case "confirmedContact": {
+      return {
+        ...model,
+        currentAction: { tag: "contact", confirmed: true },
+      };
+    }
+
     case "declaredContact": {
       const { fromPlayer, toPlayer } = msg.data;
 
@@ -247,11 +254,6 @@ const update = (model: Model, msg: Msg): Model => {
     }
 
     case "clickedContact": {
-      // return {
-      //   ...model,
-      //   currentAction: { tag: "contact", player: msg.player },
-      //   currentInput: "",
-      // };
       return model;
     }
 

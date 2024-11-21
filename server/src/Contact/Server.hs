@@ -197,6 +197,7 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
             modifyGame server $
               \game -> Game.updateContact game player maybeWord
 
+          Player.sendWebSocket player ConfirmedContact
           pure True
 
         -- TODO - this branch v messy, can refactor

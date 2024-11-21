@@ -4,6 +4,8 @@ import * as C from "purify-ts/Codec";
 import { type PlayerId, playerIdCodec } from "contact/app/data/player";
 
 namespace Codec_ {
+  // TODO - merge this module with Purify.Codec (underscore name kind of silly)
+
   // TODO - add codec to convert between undefined in TS and null in JSON
   // (Maybe datatype™)
 
@@ -34,6 +36,7 @@ export type SyncGamePlayer = { name: PlayerId; message: string };
 
 export type ServerMessage =
   | { tag: "clearedHint"; data: { playerName: PlayerId } }
+  | { tag: "confirmedContact" }
   | {
       tag: "declaredContact";
       data: { fromPlayer: PlayerId; toPlayer: PlayerId };
@@ -75,6 +78,7 @@ const syncGamePlayerCodec: Codec<SyncGamePlayer> = Codec.interface({
 
 export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
   Codec_.tagged("clearedHint", { playerName: playerIdCodec }),
+  Codec_.nullary("confirmedContact"),
   Codec_.tagged("declaredContact", {
     fromPlayer: playerIdCodec,
     toPlayer: playerIdCodec,
