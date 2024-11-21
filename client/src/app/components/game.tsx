@@ -333,7 +333,14 @@ const playerContactState = (model: Model, player: Player): PlayerState => {
 };
 
 const inputHeaderText = (model: Model): string => {
-  const { contact, countdown, currentAction, myPlayerName } = model;
+  const {
+    contact,
+    countdown,
+    currentAction,
+    currentInput,
+    myPlayerName,
+    secretWord,
+  } = model;
 
   if (contact !== undefined) {
     const { guessingPlayer, hintingPlayer, result } = contact;
@@ -346,7 +353,17 @@ const inputHeaderText = (model: Model): string => {
         const otherPlayer =
           myPlayerName === guessingPlayer ? hintingPlayer : guessingPlayer;
 
-        return `you are about to contact with ${otherPlayer}`;
+        const isContactConfirmed =
+          currentAction.tag === "contact" && currentAction.confirmed;
+
+        return isContactConfirmed
+          ? `you are about to contact with ${otherPlayer}`
+          : model.currentInput === ""
+          ? `guess ${otherPlayer}'s word!`
+          : secretWord.status === "guessing" &&
+            !model.currentInput.startsWith(model.secretWord.word)
+          ? "BAD BAD BAD"
+          : `press enter to send your guess`;
       }
 
       return `${guessingPlayer} and ${hintingPlayer} are about to contact`;
@@ -357,9 +374,6 @@ const inputHeaderText = (model: Model): string => {
   }
 
   switch (currentAction.tag) {
-    case "contact": {
-      return "enter your guess!";
-    }
     case "hinting": {
       return "press escape to stop sharing your hint";
     }
@@ -367,6 +381,10 @@ const inputHeaderText = (model: Model): string => {
       return model.currentInput === ""
         ? "words, words, words..."
         : "press enter to share your hint with everyone";
+    }
+    default: {
+      // IMPOSSIBLE CASE
+      return "";
     }
   }
 };
@@ -507,12 +525,14 @@ export default function Game({
           }}
           onEnter={() => {
             if (model.currentAction.tag === "contact") {
-              sendServer({
-                tag: "confirmContact",
-                data: {
-                  maybeWord: model.currentInput || null,
-                },
-              });
+              if (model.currentInput.startsWith(model.secretWord.word)) {
+                sendServer({
+                  tag: "confirmContact",
+                  data: {
+                    maybeWord: model.currentInput || null,
+                  },
+                });
+              }
             } else if (model.currentAction.tag === "thinking") {
               dispatch({ tag: "sharedHint" });
 
