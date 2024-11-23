@@ -6,6 +6,7 @@ module Contact.Message.Server
     JoinedGameMessage (..),
     LeftGameMessage (..),
     RevealedContactMessage (..),
+    RevealedContactResult (..),
     ServerMessage (..),
     SharedHintMessage (..),
     SyncGameMessage (..),
@@ -82,11 +83,19 @@ data RevealedContactMessage = RevealedContactMessage
     guessingPlayer :: Text,
     hintedWord :: Maybe Text,
     hintingPlayer :: Text,
-    maybeRevealedLetter :: Maybe Char
+    maybeResult :: Maybe RevealedContactResult
   }
   deriving (Generic, Show)
 
 instance ToJSON RevealedContactMessage
+
+data RevealedContactResult = RevealedContactResult
+  { isGameOver :: Bool,
+    revealedLetter :: Char
+  }
+  deriving (Generic, Show)
+
+instance ToJSON RevealedContactResult
 
 data SharedHintMessage = SharedHintMessage
   { description :: Text,

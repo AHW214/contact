@@ -191,7 +191,7 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 
       // TODO - can remove above Player fields from model
       // TODO - make message field names consistent (e.g. "guessed" -> "guessing")
-      const { guessedWord, hintedWord, maybeRevealedLetter } = msg.data;
+      const { guessedWord, hintedWord, maybeResult } = msg.data;
 
       return {
         ...model,
@@ -200,7 +200,7 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
           result: {
             guessingWord: guessedWord ?? undefined,
             hintingWord: hintedWord ?? undefined,
-            revealedLetter: maybeRevealedLetter ?? undefined,
+            revealedLetter: maybeResult?.revealedLetter ?? undefined,
           },
         },
       };

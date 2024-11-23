@@ -34,6 +34,11 @@ export type ClientMessage =
 
 export type SyncGamePlayer = { name: PlayerId; message: string };
 
+export type RevealedContactResult = {
+  isGameOver: boolean;
+  revealedLetter: string;
+};
+
 export type ServerMessage =
   | { tag: "clearedHint"; data: { playerName: PlayerId } }
   | { tag: "confirmedContact" }
@@ -51,7 +56,7 @@ export type ServerMessage =
         guessingPlayer: PlayerId;
         hintedWord: string | null;
         hintingPlayer: PlayerId;
-        maybeRevealedLetter: string | null;
+        maybeResult: RevealedContactResult | null;
       };
     }
   | { tag: "sharedHint"; data: { description: string; player: PlayerId } }
@@ -76,6 +81,12 @@ const syncGamePlayerCodec: Codec<SyncGamePlayer> = Codec.interface({
   message: C.string,
 });
 
+const revealedContactResultCodec: Codec<RevealedContactResult> =
+  Codec.interface({
+    isGameOver: C.boolean,
+    revealedLetter: C.string,
+  });
+
 export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
   Codec_.tagged("clearedHint", { playerName: playerIdCodec }),
   Codec_.nullary("confirmedContact"),
@@ -91,7 +102,7 @@ export const serverMessageCodec: Codec<ServerMessage> = C.oneOf([
     guessingPlayer: playerIdCodec,
     hintedWord: C.nullable(C.string),
     hintingPlayer: playerIdCodec,
-    maybeRevealedLetter: C.nullable(C.string),
+    maybeResult: C.nullable(revealedContactResultCodec),
   }),
   Codec_.tagged("sharedHint", { description: C.string, player: playerIdCodec }),
   Codec_.tagged("syncGame", {

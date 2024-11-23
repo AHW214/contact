@@ -230,10 +230,16 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
                   pure ()
                 Just (contact, result) ->
                   case result of
-                    Missed -> broadcastContactResult contact Nothing
-                    Contacted game' nextLetter -> do
+                    Missed ->
+                      broadcastContactResult contact Nothing
+                    Contacted game' revealedLetter -> do
                       STM.writeTVar serverGame game'
-                      broadcastContactResult contact $ Just nextLetter
+                      broadcastContactResult contact $
+                        Just
+                          RevealedContactResult
+                            { isGameOver = Game.isGameOver game',
+                              revealedLetter
+                            }
 
             -- TODO - magic numbers
             runAfterDelay 3000 $
@@ -243,8 +249,8 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
 
           pure True
           where
-            broadcastContactResult :: Contact -> Maybe Char -> STM ()
-            broadcastContactResult contact maybeRevealedLetter =
+            broadcastContactResult :: Contact -> Maybe RevealedContactResult -> STM ()
+            broadcastContactResult contact maybeResult =
               let Contact
                     { contactGuessingPlayer,
                       contactGuessingWord,
@@ -258,7 +264,7 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
                           guessingPlayer = contactGuessingPlayer,
                           hintedWord = contactHintingWord,
                           hintingPlayer = contactHintingPlayer,
-                          maybeRevealedLetter
+                          maybeResult
                         }
         Disconnect -> do
           putStrLn $ "player " <> show playerName <> " disconnected"
