@@ -11,12 +11,8 @@ module Contact.Server
 where
 
 import Contact.Data.Game
-  ( Contact
-      ( contactGuessingPlayer,
-        contactGuessingWord,
-        contactHintingPlayer,
-        contactHintingWord
-      ),
+  ( Contact (..),
+    ContactResult (..),
     Game (..),
     newGame,
   )
@@ -227,45 +223,17 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
           -- TODO - magic numbers
           runAfterDelay 4500 $ do
             STM.atomically $ do
-              game@Game {gameContact} <- readGame server
-
-              case gameContact of
+              game <- readGame server
+              case Game.checkContact game of
                 Nothing ->
                   -- TODO - error case
                   pure ()
-                Just
-                  Game.Contact
-                    { contactGuessingPlayer,
-                      contactGuessingWord,
-                      contactHintingPlayer,
-                      contactHintingWord
-                    } -> do
-                    -- TODO - CHECK FOR WIN CONDITIONS AND INFORM PLAYERS IF
-                    -- GAME OVER
-                    let result =
-                          case (contactGuessingWord, contactHintingWord) of
-                            (Just guessingWord, Just hintingWord)
-                              | guessingWord == hintingWord ->
-                                  Just $ Game.revealSecretLetter game
-                            _ -> Nothing
-
-                        msgOut =
-                          RevealedContact $
-                            RevealedContactMessage
-                              { guessedWord = contactGuessingWord,
-                                guessingPlayer = contactGuessingPlayer,
-                                hintedWord = contactHintingWord,
-                                hintingPlayer = contactHintingPlayer,
-                                maybeRevealedLetter = fmap snd result
-                              }
-
-                    case result of
-                      Just (game', _) ->
-                        STM.writeTVar serverGame game'
-                      Nothing ->
-                        pure ()
-
-                    broadcastMessage server msgOut
+                Just (contact, result) ->
+                  case result of
+                    Missed -> broadcastContactResult contact Nothing
+                    Contacted game' nextLetter -> do
+                      STM.writeTVar serverGame game'
+                      broadcastContactResult contact $ Just nextLetter
 
             -- TODO - magic numbers
             runAfterDelay 3000 $
@@ -274,6 +242,24 @@ handleMessage server@Server {serverGame} player@Player {playerName} message =
                 broadcastMessage server EndContact
 
           pure True
+          where
+            broadcastContactResult :: Contact -> Maybe Char -> STM ()
+            broadcastContactResult contact maybeRevealedLetter =
+              let Contact
+                    { contactGuessingPlayer,
+                      contactGuessingWord,
+                      contactHintingPlayer,
+                      contactHintingWord
+                    } = contact
+               in broadcastMessage server $
+                    RevealedContact $
+                      RevealedContactMessage
+                        { guessedWord = contactGuessingWord,
+                          guessingPlayer = contactGuessingPlayer,
+                          hintedWord = contactHintingWord,
+                          hintingPlayer = contactHintingPlayer,
+                          maybeRevealedLetter
+                        }
         Disconnect -> do
           putStrLn $ "player " <> show playerName <> " disconnected"
           pure False

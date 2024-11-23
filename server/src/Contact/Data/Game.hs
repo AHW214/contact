@@ -1,10 +1,13 @@
 module Contact.Data.Game
   ( Contact (..),
+    ContactResult (..),
     Game (..),
     addPlayer,
+    checkContact,
     clearContact,
     getPlayers,
     hasPlayer,
+    isGameOver,
     newGame,
     removePlayer,
     revealSecretLetter,
@@ -22,6 +25,13 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as Text
 
+data Game = Game
+  { gameContact :: Maybe Contact,
+    gamePlayers :: Map Text Player,
+    gameSecretWord :: Text,
+    gameSecretWordRevealed :: Text
+  }
+
 data Contact = Contact
   { contactGuessingPlayer :: Text,
     contactGuessingWord :: Maybe Text,
@@ -29,12 +39,23 @@ data Contact = Contact
     contactHintingWord :: Maybe Text
   }
 
-data Game = Game
-  { gameContact :: Maybe Contact,
-    gamePlayers :: Map Text Player,
-    gameSecretWord :: Text,
-    gameSecretWordRevealed :: Text
-  }
+data ContactResult
+  = Contacted Game Char
+  | Missed
+
+checkContact :: Game -> Maybe (Contact, ContactResult)
+checkContact game@Game {gameContact} =
+  case gameContact of
+    Nothing -> Nothing
+    Just contact@Contact {contactGuessingWord, contactHintingWord} ->
+      let result =
+            case (contactGuessingWord, contactHintingWord) of
+              (Just guessingWord, Just hintingWord)
+                | guessingWord == hintingWord ->
+                    let (game', nextLetter) = revealSecretLetter game
+                     in Contacted game' nextLetter
+              _ -> Missed
+       in Just (contact, result)
 
 clearContact :: Game -> Game
 clearContact game@Game {gameContact, gamePlayers} =
@@ -87,6 +108,10 @@ revealSecretLetter game@Game {gameSecretWord, gameSecretWordRevealed} =
     secretWordRevealed :: Text
     secretWordRevealed =
       Text.take (1 + Text.length gameSecretWordRevealed) gameSecretWord
+
+isGameOver :: Game -> Bool
+isGameOver Game {gameSecretWord, gameSecretWordRevealed} =
+  gameSecretWordRevealed == gameSecretWord
 
 newGame :: Game
 newGame =
