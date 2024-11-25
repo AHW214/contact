@@ -241,13 +241,29 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 const update = (model: Model, msg: Msg): Model => {
   switch (msg.tag) {
     case "changedInput": {
-      const { currentAction } = model;
+      const { currentAction, secretWord } = model;
 
-      const isInputDisabled =
-        currentAction.tag === "hinting" ||
-        (currentAction.tag === "contact" && currentAction.confirmed);
+      switch (currentAction.tag) {
+        case "contact": {
+          const guessingWord = msg.value;
 
-      return isInputDisabled ? model : { ...model, currentInput: msg.value };
+          const canPlayerStillGuess = !currentAction.confirmed;
+          const isGuessAllowed = guessingWord.startsWith(secretWord.word);
+
+          return canPlayerStillGuess && isGuessAllowed
+            ? { ...model, currentInput: guessingWord }
+            : model;
+        }
+
+        case "hinting": {
+          return model;
+        }
+
+        case "thinking":
+        default: {
+          return { ...model, currentInput: msg.value };
+        }
+      }
     }
 
     case "clickedCancel": {
