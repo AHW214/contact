@@ -248,7 +248,12 @@ const update = (model: Model, msg: Msg): Model => {
           const guessingWord = msg.value;
 
           const canPlayerStillGuess = !currentAction.confirmed;
-          const isGuessAllowed = guessingWord.startsWith(secretWord.word);
+
+          // TODO - seems silly / redundant / bad
+          const isGuessAllowed =
+            guessingWord.length <= secretWord.word.length
+              ? secretWord.word.startsWith(guessingWord)
+              : guessingWord.startsWith(secretWord.word);
 
           return canPlayerStillGuess && isGuessAllowed
             ? { ...model, currentInput: guessingWord }
@@ -369,7 +374,8 @@ const inputHeaderText = (model: Model): string => {
           ? `you are about to contact with ${otherPlayer}`
           : model.currentInput === ""
           ? `guess ${otherPlayer}'s word!`
-          : secretWord.status === "guessing" &&
+          : // TODO - dont want this (have ghost characters that fill in instead)
+          secretWord.status === "guessing" &&
             !model.currentInput.startsWith(model.secretWord.word)
           ? "BAD BAD BAD"
           : `press enter to send your guess`;
