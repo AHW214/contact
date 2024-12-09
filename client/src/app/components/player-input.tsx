@@ -17,13 +17,11 @@ export interface PlayerInputProps extends InputProps {
 const guessMask = (secretWordPrefix: string, guess: string) => {
   const prefixTyped = guess.slice(0, secretWordPrefix.length);
   const prefixRemaining = secretWordPrefix.slice(guess.length);
-  const guessAfterPrefix = guess.slice(secretWordPrefix.length);
 
   return (
     <span className="absolute p-1.5 font-normal">
-      <span>{prefixTyped}</span>
+      <span className="invisible">{prefixTyped}</span>
       <span className="text-zinc-400">{prefixRemaining}</span>
-      <span>{guessAfterPrefix}</span>
     </span>
   );
 };
@@ -40,7 +38,8 @@ export default function PlayerInput({
   const isSpectating = state.tag === "spectatingContact";
 
   const isGuessing =
-    state.tag === "performingContact" && state.contact.tag === "declared";
+    state.tag === "performingContact" &&
+    (state.contact.tag === "declared" || hideContactResult);
 
   const wasSilentContact =
     state.tag === "performingContact" &&
