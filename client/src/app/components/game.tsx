@@ -534,6 +534,7 @@ export default function Game({
             model.countdown !== undefined && model.countdown > 0
           }
           ref={inputRef}
+          secretWordPrefix={model.secretWord.word}
           state={playerContactState(model, myPlayer)}
           onChange={(ev) => {
             dispatch({ tag: "changedInput", value: ev.target.value });
