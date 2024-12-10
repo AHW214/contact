@@ -15,13 +15,19 @@ import WordDisplay, {
   updateSecretWord,
 } from "contact/app/components/word-display";
 import Wordmaster from "contact/app/components/wordmaster";
-import type { Player, PlayerAction, PlayerId } from "contact/app/data/player";
+import type {
+  HintState,
+  Player,
+  PlayerAction,
+  PlayerId,
+} from "contact/app/data/player";
 import type { ClientMessage, ServerMessage } from "contact/app/network/message";
 import * as Record from "contact/app/util/record";
 
 type Contact = {
   guessingPlayer: PlayerId;
   hintingPlayer: PlayerId;
+  knownHint: string;
   result:
     | {
         guessingWord: string | undefined;
@@ -113,9 +119,15 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
     case "declaredContact": {
       const { fromPlayer, toPlayer } = msg.data;
 
+      const hintState = model.players[toPlayer]?.hintState;
+      // TODO: impossible case at end of ternary - include hinted word in
+      // response from server? or store value explicitly outside model.players
+      const knownHint = hintState?.tag === "sharing" ? hintState.word : "";
+
       const contact = {
         guessingPlayer: fromPlayer,
         hintingPlayer: toPlayer,
+        knownHint,
         result: undefined,
       };
 
@@ -128,7 +140,12 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
         ? {
             currentAction: {
               tag: "contact",
-              state: { tag: "guessing", didMisclick: false },
+              state: {
+                tag: "guessing",
+                didMisclick: false,
+                isSameAsHint: false,
+              },
+              // TODO - type assertion bad
             } as PlayerAction,
             currentInput: "",
           }
@@ -244,10 +261,15 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 const update = (model: Model, msg: Msg): Model => {
   switch (msg.tag) {
     case "changedInput": {
-      const { currentAction, currentInput, secretWord } = model;
+      const { contact, currentAction, currentInput, secretWord } = model;
 
       switch (currentAction.tag) {
         case "contact": {
+          if (contact === undefined) {
+            // TODO - impossible case
+            return model;
+          }
+
           const guessingWord = msg.value;
 
           if (currentAction.state.tag !== "guessing") {
@@ -260,11 +282,17 @@ const update = (model: Model, msg: Msg): Model => {
               ? secretWord.word.startsWith(guessingWord)
               : guessingWord.startsWith(secretWord.word);
 
+          const isGuessSameAsHint = guessingWord === contact.knownHint;
+
           return {
             ...model,
             currentAction: {
               ...currentAction,
-              state: { ...currentAction.state, didMisclick: !isGuessAllowed },
+              state: {
+                ...currentAction.state,
+                didMisclick: !isGuessAllowed,
+                isSameAsHint: isGuessSameAsHint,
+              },
             },
             currentInput: isGuessAllowed ? guessingWord : currentInput,
           };
@@ -364,7 +392,8 @@ const playerContactState = (model: Model, player: Player): PlayerState => {
 };
 
 const inputHeaderText = (model: Model): string => {
-  const { contact, countdown, currentAction, myPlayerName, secretWord } = model;
+  const { contact, countdown, currentAction, currentInput, myPlayerName } =
+    model;
 
   if (contact !== undefined) {
     const { guessingPlayer, hintingPlayer, result } = contact;
@@ -377,19 +406,30 @@ const inputHeaderText = (model: Model): string => {
         const otherPlayer =
           myPlayerName === guessingPlayer ? hintingPlayer : guessingPlayer;
 
-        const isContactConfirmed =
+        if (
           currentAction.tag === "contact" &&
-          currentAction.state.tag === "confirmed";
+          currentAction.state.tag === "confirmed"
+        ) {
+          return `you are about to contact with ${otherPlayer}`;
+        }
 
-        return isContactConfirmed
-          ? `you are about to contact with ${otherPlayer}`
-          : model.currentInput === ""
-          ? `guess ${otherPlayer}'s word!`
-          : // TODO - dont want this (have ghost characters that fill in instead)
-          secretWord.status === "guessing" &&
-            !model.currentInput.startsWith(model.secretWord.word)
-          ? "BAD BAD BAD"
-          : `press enter to send your guess`;
+        if (myPlayerName === guessingPlayer) {
+          const { didMisclick, isSameAsHint } =
+            currentAction.tag === "contact" &&
+            currentAction.state.tag === "guessing"
+              ? currentAction.state
+              : { didMisclick: false, isSameAsHint: false };
+
+          return didMisclick
+            ? "guess must start with known prefix"
+            : isSameAsHint
+            ? "guess cannot be same as hint"
+            : currentInput === ""
+            ? `guess ${otherPlayer}'s word!`
+            : "press enter to send your guess";
+        }
+
+        return `${otherPlayer} is guessing...`;
       }
 
       return `${guessingPlayer} and ${hintingPlayer} are about to contact`;

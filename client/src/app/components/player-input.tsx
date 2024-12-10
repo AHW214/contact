@@ -3,7 +3,7 @@ import type { Ref } from "react";
 import Input, { type InputProps } from "contact/app/components/input";
 // TODO - lift into own module?
 import type { PlayerState } from "contact/app/components/player";
-import type { PlayerAction } from "contact/app/data/player";
+import type { ContactState, PlayerAction } from "contact/app/data/player";
 
 export interface PlayerInputProps extends InputProps {
   currentAction: PlayerAction;
@@ -17,6 +17,7 @@ export interface PlayerInputProps extends InputProps {
 const guessMask = (
   secretWordPrefix: string,
   didMisclick: boolean,
+  isGuessSameAsHint: boolean,
   guess: string
 ) => {
   const prefixTyped = guess.slice(0, secretWordPrefix.length);
@@ -27,7 +28,11 @@ const guessMask = (
       <div className="invisible">{prefixTyped}</div>
       <div
         className={`text-zinc-400 ${
-          didMisclick ? "first-letter:text-red-400" : ""
+          didMisclick
+            ? "first-letter:text-red-400"
+            : isGuessSameAsHint
+            ? "text-red-400"
+            : ""
         }`}
       >
         {prefixRemaining}
@@ -51,10 +56,10 @@ export default function PlayerInput({
     state.tag === "performingContact" &&
     (state.contact.tag === "declared" || hideContactResult);
 
-  const didMisclick =
-    currentAction.tag === "contact" &&
-    currentAction.state.tag === "guessing" &&
-    currentAction.state.didMisclick;
+  const { didMisclick, isSameAsHint } =
+    currentAction.tag === "contact" && currentAction.state.tag === "guessing"
+      ? currentAction.state
+      : { didMisclick: false, isSameAsHint: false };
 
   const wasSilentContact =
     state.tag === "performingContact" &&
@@ -68,7 +73,8 @@ export default function PlayerInput({
 
   return (
     <div className="relative">
-      {isGuessing && guessMask(secretWordPrefix, didMisclick, value)}
+      {isGuessing &&
+        guessMask(secretWordPrefix, didMisclick, isSameAsHint, value)}
       <Input
         {...restProps}
         className={`${
