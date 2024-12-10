@@ -12,12 +12,11 @@ export interface PlayerInputProps extends InputProps {
   secretWordPrefix: string;
   state: PlayerState;
   value: string;
-  misclick: boolean;
 }
 
 const guessMask = (
   secretWordPrefix: string,
-  misclick: boolean,
+  didMisclick: boolean,
   guess: string
 ) => {
   const prefixTyped = guess.slice(0, secretWordPrefix.length);
@@ -28,7 +27,7 @@ const guessMask = (
       <div className="invisible">{prefixTyped}</div>
       <div
         className={`text-zinc-400 ${
-          misclick ? "first-letter:text-red-400" : ""
+          didMisclick ? "first-letter:text-red-400" : ""
         }`}
       >
         {prefixRemaining}
@@ -44,7 +43,6 @@ export default function PlayerInput({
   secretWordPrefix,
   state,
   value,
-  misclick,
   ...restProps
 }: PlayerInputProps) {
   const isSpectating = state.tag === "spectatingContact";
@@ -53,6 +51,11 @@ export default function PlayerInput({
     state.tag === "performingContact" &&
     (state.contact.tag === "declared" || hideContactResult);
 
+  const didMisclick =
+    currentAction.tag === "contact" &&
+    currentAction.state.tag === "guessing" &&
+    currentAction.state.didMisclick;
+
   const wasSilentContact =
     state.tag === "performingContact" &&
     state.contact.tag === "revealed" &&
@@ -60,11 +63,12 @@ export default function PlayerInput({
 
   const isInputEmboldened =
     (currentAction.tag === "hinting" && !isSpectating) ||
-    (currentAction.tag === "contact" && currentAction.confirmed);
+    (currentAction.tag === "contact" &&
+      currentAction.state.tag === "confirmed");
 
   return (
     <div className="relative">
-      {isGuessing && guessMask(secretWordPrefix, true, value)}
+      {isGuessing && guessMask(secretWordPrefix, didMisclick, value)}
       <Input
         {...restProps}
         className={`${

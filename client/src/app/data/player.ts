@@ -6,8 +6,12 @@ export type PlayerId = WithBrand<string, "Player">;
 
 export type HintState = { tag: "sharing"; word: string } | { tag: "thinking" };
 
+export type ContactState =
+  | { tag: "guessing"; didMisclick: boolean }
+  | { tag: "confirmed" };
+
 export type PlayerAction =
-  | { tag: "contact"; confirmed: boolean }
+  | { tag: "contact"; state: ContactState }
   | { tag: "hinting" }
   | { tag: "thinking" };
 

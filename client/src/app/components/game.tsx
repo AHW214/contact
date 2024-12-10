@@ -106,7 +106,7 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
     case "confirmedContact": {
       return {
         ...model,
-        currentAction: { tag: "contact", confirmed: true },
+        currentAction: { tag: "contact", state: { tag: "confirmed" } },
       };
     }
 
@@ -126,7 +126,10 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 
       const { currentAction, currentInput } = isMyPlayerContacting
         ? {
-            currentAction: { tag: "contact" as const, confirmed: false },
+            currentAction: {
+              tag: "contact",
+              state: { tag: "guessing", didMisclick: false },
+            } as PlayerAction,
             currentInput: "",
           }
         : model;
@@ -241,13 +244,15 @@ const handleServerMessage = (model: Model, msg: ServerMessage): Model => {
 const update = (model: Model, msg: Msg): Model => {
   switch (msg.tag) {
     case "changedInput": {
-      const { currentAction, secretWord } = model;
+      const { currentAction, currentInput, secretWord } = model;
 
       switch (currentAction.tag) {
         case "contact": {
           const guessingWord = msg.value;
 
-          const canPlayerStillGuess = !currentAction.confirmed;
+          if (currentAction.state.tag !== "guessing") {
+            return model;
+          }
 
           // TODO - seems silly / redundant / bad
           const isGuessAllowed =
@@ -255,9 +260,14 @@ const update = (model: Model, msg: Msg): Model => {
               ? secretWord.word.startsWith(guessingWord)
               : guessingWord.startsWith(secretWord.word);
 
-          return canPlayerStillGuess && isGuessAllowed
-            ? { ...model, currentInput: guessingWord }
-            : model;
+          return {
+            ...model,
+            currentAction: {
+              ...currentAction,
+              state: { ...currentAction.state, didMisclick: !isGuessAllowed },
+            },
+            currentInput: isGuessAllowed ? guessingWord : currentInput,
+          };
         }
 
         case "hinting": {
@@ -368,7 +378,8 @@ const inputHeaderText = (model: Model): string => {
           myPlayerName === guessingPlayer ? hintingPlayer : guessingPlayer;
 
         const isContactConfirmed =
-          currentAction.tag === "contact" && currentAction.confirmed;
+          currentAction.tag === "contact" &&
+          currentAction.state.tag === "confirmed";
 
         return isContactConfirmed
           ? `you are about to contact with ${otherPlayer}`
@@ -561,7 +572,6 @@ export default function Game({
             }
           }}
           value={model.currentInput}
-          misclick={false}
         />
       </div>
     </div>
