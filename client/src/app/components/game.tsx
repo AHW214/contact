@@ -561,6 +561,7 @@ export default function Game({
             }
           }}
           value={model.currentInput}
+          misclick={false}
         />
       </div>
     </div>

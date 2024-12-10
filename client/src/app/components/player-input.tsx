@@ -12,17 +12,28 @@ export interface PlayerInputProps extends InputProps {
   secretWordPrefix: string;
   state: PlayerState;
   value: string;
+  misclick: boolean;
 }
 
-const guessMask = (secretWordPrefix: string, guess: string) => {
+const guessMask = (
+  secretWordPrefix: string,
+  misclick: boolean,
+  guess: string
+) => {
   const prefixTyped = guess.slice(0, secretWordPrefix.length);
   const prefixRemaining = secretWordPrefix.slice(guess.length);
 
   return (
-    <span className="absolute p-1.5 font-normal">
-      <span className="invisible">{prefixTyped}</span>
-      <span className="text-zinc-400">{prefixRemaining}</span>
-    </span>
+    <div className="absolute flex p-1.5 font-normal">
+      <div className="invisible">{prefixTyped}</div>
+      <div
+        className={`text-zinc-400 ${
+          misclick ? "first-letter:text-red-400" : ""
+        }`}
+      >
+        {prefixRemaining}
+      </div>
+    </div>
   );
 };
 
@@ -33,6 +44,7 @@ export default function PlayerInput({
   secretWordPrefix,
   state,
   value,
+  misclick,
   ...restProps
 }: PlayerInputProps) {
   const isSpectating = state.tag === "spectatingContact";
@@ -52,7 +64,7 @@ export default function PlayerInput({
 
   return (
     <div className="relative">
-      {isGuessing && guessMask(secretWordPrefix, value)}
+      {isGuessing && guessMask(secretWordPrefix, true, value)}
       <Input
         {...restProps}
         className={`${
